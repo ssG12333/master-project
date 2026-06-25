@@ -1,0 +1,21 @@
+torch
+numpy
+pandas
+scikit-learn
+matplotlib
+statsmodels
+arch # Package name for arch.unitroot is usually just 'arch' or 'arch-unitroot'
+einops
+reformer-pytorch
+tqdm
+scipy
+patoolib
+sktime
+pynvml
+psutil
+sympy
+# Additional common PyTorch dependencies (often used alongside torch)
+torchvision
+torchaudio
+# For CUDA support (if using GPU)
+# cudatoolkit # This is typically installed via conda or specific PyTorch wheels, not pip directly.

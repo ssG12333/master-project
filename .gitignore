@@ -1,0 +1,47 @@
+# Portfolio repository allowlist
+# Raw project folders, zip backups, datasets, weights, and run outputs stay local.
+
+/*
+
+!/.gitignore
+!/README.md
+!/docs/
+!/docs/**
+!/portfolio-projects/
+!/portfolio-projects/**
+!/projects/
+!/projects/**
+
+# Safety exclusions inside allowed folders
+**/.idea/
+**/__pycache__/
+**/node_modules/
+**/.venv/
+**/venv/
+**/runs/
+**/wandb/
+**/weights/
+**/train/images/
+**/valid/images/
+**/val/images/
+**/test/images/
+**/train/labels/
+**/valid/labels/
+**/val/labels/
+**/test/labels/
+*.pt
+*.pth
+*.onnx
+*.engine
+*.pkl
+*.npy
+*.npz
+*.pyc
+*.zip
+*.rar
+*.7z
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.bmp

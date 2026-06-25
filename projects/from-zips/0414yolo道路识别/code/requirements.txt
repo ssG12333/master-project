@@ -1,0 +1,30 @@
+# 基础依赖
+numpy
+opencv-python
+torch
+torchvision
+scipy
+
+# 数据处理和增强
+albumentations
+Pillow
+pandas
+
+# 可视化工具
+matplotlib
+tensorboard
+
+# 模型优化和部署
+onnx
+onnxruntime
+tensorrt
+
+# 工具库
+tqdm
+PyYAML
+scikit-learn
+
+# 开发工具
+pytest
+black
+flake8 

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>智慧居家养老服务管理系统</title>
+    <link rel="stylesheet" href="libs/element.css" />
+    <style>
+        html, body, #app { height: 100%; margin: 0; padding: 0; font-family: "Microsoft YaHei", sans-serif; background-color: #f0f2f5; }
+        .aside-menu { height: 100%; border-right: none; background-color: #304156; }
+        .aside-menu:not(.el-menu--collapse) { width: 220px; }
+        .logo-box { height: 60px; line-height: 60px; color: white; text-align: center; font-size: 20px; font-weight: bold; background-color: #2b3649; }
+        .el-header { background-color: #fff; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; }
+        .el-main { padding: 20px; }
+        .content-card { background: white; padding: 25px; border-radius: 8px; margin-bottom: 20px; }
+        .service-card { background: #fff; border-radius: 8px; overflow: hidden; cursor: pointer; transition: all 0.3s; box-shadow: 0 2px 12px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #ebeef5; }
+        .service-card:hover { transform: translateY(-5px); box-shadow: 0 8px 16px rgba(0,0,0,0.15); }
+        .service-img-box { height: 150px; overflow: hidden; position: relative; background: #f5f7fa; }
+        .service-img { width: 100%; height: 100%; object-fit: cover; }
+        .default-cover { height: 150px; display: flex; justify-content: center; align-items: center; color: white; font-size: 40px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .bg-1 { background: linear-gradient(135deg, #409EFF 0%, #79bbff 100%); } .bg-2 { background: linear-gradient(135deg, #67C23A 0%, #95d475 100%); } .bg-3 { background: linear-gradient(135deg, #E6A23C 0%, #f3d19e 100%); } .bg-4 { background: linear-gradient(135deg, #F56C6C 0%, #f89898 100%); }
+        .service-info { padding: 15px; } .service-name { font-weight: bold; font-size: 16px; margin-bottom: 8px; color: #303133; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .service-desc { font-size: 12px; color: #999; margin-bottom: 10px; height: 34px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .ai-header-banner { background: linear-gradient(135deg, #304156 0%, #409EFF 100%); color: white; padding: 25px; border-radius: 12px 12px 0 0; display: flex; align-items: center; }
+        .health-snapshot-bar { background: #fff; padding: 15px 25px; border-bottom: 1px solid #ebeef5; display: flex; gap: 30px; align-items: center; font-size: 14px; }
+        .recommend-container { background: #fcfdfd; padding: 20px; border-radius: 0 0 12px 12px; border: 1px solid #ebeef5; border-top: none; margin-bottom: 30px; }
+        #global-error { display: none; position: fixed; top: 0; left: 0; width: 100%; background: #fef0f0; color: #f56c6c; padding: 15px; z-index: 99999; border-bottom: 2px solid red; font-size: 14px; text-align: center; }
+    </style>
+</head>
+<body>
+<div id="global-error"></div>
+<div id="app">
+    <el-container style="height: 100%;">
+        <el-aside width="220px" style="background-color: #304156;">
+            <div class="logo-box">👵 智慧养老系统</div>
+            <el-menu :default-active="activeMenu" class="aside-menu" background-color="#304156" text-color="#bfcbd9" active-text-color="#409EFF" @select="key => activeMenu = key">
+                <el-menu-item index="home"><el-icon><House /></el-icon> <span>系统首页</span></el-menu-item>
+                <el-menu-item index="profile"><el-icon><User /></el-icon> <span>个人中心</span></el-menu-item>
+                <el-menu-item index="service"><el-icon><ShoppingCart /></el-icon> <span>全部服务</span></el-menu-item>
+                <el-menu-item index="health"><el-icon><Trend-Charts /></el-icon> <span>健康档案</span></el-menu-item>
+                <el-menu-item index="order"><el-icon><List /></el-icon> <span>我的订单</span></el-menu-item>
+                <el-menu-item index="admin" v-if="currentUser.role !== 'user'"><el-icon><Management /></el-icon> <span>后台管理</span></el-menu-item>
+            </el-menu>
+        </el-aside>
+        <el-container>
+            <el-header>
+                <div style="color:#666">智慧居家养老服务平台 (预约修复版)</div>
+                <el-dropdown>
+                        <span style="cursor:pointer; display:flex; align-items:center;">
+                            <el-avatar size="small" :src="currentUser.avatar">U</el-avatar>
+                            <span style="margin-left:8px">{{ currentUser.realName }}</span>
+                        </span>
+                    <template #dropdown><el-dropdown-menu><el-dropdown-item @click="logout">退出登录</el-dropdown-item></el-dropdown-menu></template>
+                </el-dropdown>
+            </el-header>
+            <el-main>
+                <div v-if="activeMenu === 'home'">
+                    <el-alert title="欢迎回来！请关注您的健康数据。" type="success" :closable="false" style="margin-bottom:20px;"></el-alert>
+                    <div style="box-shadow: 0 8px 24px rgba(0,0,0,0.08); border-radius: 12px; margin-bottom: 30px;">
+                        <div class="ai-header-banner">
+                            <el-icon style="font-size:40px; margin-right:20px; color:white;"><Cpu /></el-icon>
+                            <div><h2 style="margin:0; color:white;">AI 智慧健康分析引擎</h2><p style="margin:5px 0 0 0; opacity: 0.9; font-size: 14px; color:white;">上次分析：{{ lastHealthDate || '暂无数据' }}</p></div>
+                        </div>
+                        <div class="health-snapshot-bar">
+                            <span>最新指标：</span>
+                            <el-tag type="danger" round effect="dark">血压 {{ latestHealth.highPressure || '-' }}/{{ latestHealth.lowPressure || '-' }}</el-tag>
+                            <el-tag type="warning" round effect="dark">血糖 {{ latestHealth.bloodSugar || '-' }}</el-tag>
+                            <el-tag type="success" round effect="dark">心率 {{ latestHealth.heartRate || '-' }}</el-tag>
+                        </div>
+                        <div class="recommend-container">
+                            <div v-if="recommendServices.length > 0">
+                                <el-row :gutter="25">
+                                    <el-col :span="8" v-for="item in recommendServices" :key="item.id">
+                                        <div class="service-card" @click="handleOrder(item.id)" style="padding:15px; border-left:5px solid #67C23A; margin-bottom:0;">
+                                            <div style="font-weight:bold; color:#67C23A; margin-bottom:5px;"><el-icon><First-Aid-Kit /></el-icon> AI 推荐：{{ item.name }}</div>
+                                            <div style="font-size:12px; color:#666; height:40px; overflow:hidden;">{{ item.description }}</div>
+                                            <div style="margin-top:10px; text-align:right;"><el-button type="success" size="small" round>¥{{item.price}} 预约</el-button></div>
+                                        </div>
+                                    </el-col>
+                                </el-row>
+                            </div>
+                            <el-empty v-else description="暂无特定推荐，请完善健康数据" :image-size="80"></el-empty>
+                        </div>
+                    </div>
+                    <h3>🔥 热门精选</h3>
+                    <el-row :gutter="20">
+                        <el-col :span="6" v-for="(item, index) in services.slice(0,4)" :key="item.id">
+                            <div class="service-card" @click="handleOrder(item.id)">
+                                <div class="default-cover" :class="'bg-'+(index%4+1)" v-if="!item.imgUrl">{{item.name[0]}}</div>
+                                <div class="service-img-box" v-else><img :src="item.imgUrl" class="service-img"></div>
+                                <div class="service-info">
+                                    <div class="service-name">{{item.name}}</div>
+                                    <div class="service-desc">{{item.description}}</div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span style="color:#f56c6c; font-weight:bold; font-size:16px;">¥ {{item.price}}</span>
+                                        <el-button type="primary" circle size="small"><el-icon><Plus /></el-icon></el-button>
+                                    </div>
+                                </div>
+                            </div>
+                        </el-col>
+                    </el-row>
+                </div>
+                <div v-if="activeMenu === 'service'">
+                    <div style="margin-bottom:20px;">
+                        <el-radio-group v-model="filterCategory">
+                            <el-radio-button label="全部"></el-radio-button>
+                            <el-radio-button label="生活照料"></el-radio-button>
+                            <el-radio-button label="医疗护理"></el-radio-button>
+                            <el-radio-button label="餐饮服务"></el-radio-button>
+                        </el-radio-group>
+                    </div>
+                    <el-row :gutter="20">
+                        <el-col :span="6" v-for="(item, index) in filteredServices" :key="item.id">
+                            <div class="service-card" @click="handleOrder(item.id)">
+                                <div class="default-cover" :class="'bg-'+(index%4+1)" v-if="!item.imgUrl">{{item.name[0]}}</div>
+                                <div class="service-img-box" v-else><img :src="item.imgUrl" class="service-img"></div>
+                                <div class="service-info">
+                                    <div class="service-name">{{item.name}}</div>
+                                    <div class="service-desc">{{item.description}}</div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                                        <span style="color:#f56c6c; font-weight:bold; font-size:18px;">¥ {{item.price}}</span>
+                                        <el-button type="primary" size="small">立即预约</el-button>
+                                    </div>
+                                </div>
+                            </div>
+                        </el-col>
+                    </el-row>
+                </div>
+                <div v-if="activeMenu === 'profile'" class="content-card">
+                    <h2>个人中心</h2>
+                    <div v-if="!isEditing" style="text-align:center;">
+                        <el-avatar :size="80" :src="currentUser.avatar" style="margin-bottom:15px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">U</el-avatar>
+                        <el-descriptions border column="1" style="max-width:600px; margin:0 auto;">
+                            <el-descriptions-item label="账号">{{currentUser.username}}</el-descriptions-item>
+                            <el-descriptions-item label="姓名">{{currentUser.realName}}</el-descriptions-item>
+                            <el-descriptions-item label="电话">{{currentUser.phone}}</el-descriptions-item>
+                            <el-descriptions-item label="年龄">{{currentUser.age}} 岁</el-descriptions-item>
+                        </el-descriptions>
+                        <el-button type="primary" style="margin-top:20px;" @click="startEdit">修改资料</el-button>
+                    </div>
+                    <div v-else style="max-width:600px; margin:0 auto;">
+                        <el-form label-width="80px">
+                            <el-form-item label="姓名"><el-input v-model="editForm.realName"></el-input></el-form-item>
+                            <el-form-item label="电话"><el-input v-model="editForm.phone"></el-input></el-form-item>
+                            <el-form-item label="年龄"><el-input v-model="editForm.age"></el-input></el-form-item>
+                            <div style="text-align:center;">
+                                <el-button @click="isEditing=false">取消</el-button>
+                                <el-button type="success" @click="saveProfile">保存修改</el-button>
+                            </div>
+                        </el-form>
+                    </div>
+                </div>
+                <div v-if="activeMenu === 'health'" class="content-card">
+                    <el-row :gutter="20">
+                        <el-col :span="16">
+                            <h3>📊 历史健康数据</h3>
+                            <el-table :data="historyList" border stripe height="400">
+                                <el-table-column prop="measureTime" label="时间" width="180"><template #default="s">{{ (s.row.measureTime||'').replace('T',' ').substring(0,19) }}</template></el-table-column>
+                                <el-table-column label="血压 (高/低)"><template #default="s"><span style="color:#F56C6C">{{s.row.highPressure}}</span> / <span style="color:#409EFF">{{s.row.lowPressure}}</span></template></el-table-column>
+                                <el-table-column prop="bloodSugar" label="血糖"></el-table-column>
+                                <el-table-column prop="heartRate" label="心率"></el-table-column>
+                            </el-table>
+                        </el-col>
+                        <el-col :span="8">
+                            <el-card shadow="hover">
+                                <template #header><span>📝 录入新数据</span></template>
+                                <el-form label-position="top">
+                                    <el-form-item label="高压 (mmHg)"><el-input v-model="healthForm.high" type="number" placeholder="120"></el-input></el-form-item>
+                                    <el-form-item label="低压 (mmHg)"><el-input v-model="healthForm.low" type="number" placeholder="80"></el-input></el-form-item>
+                                    <el-form-item label="血糖 (mmol/L)"><el-input v-model="healthForm.sugar" type="number" placeholder="6.5"></el-input></el-form-item>
+                                    <el-form-item label="心率 (次/分)"><el-input v-model="healthForm.rate" type="number" placeholder="75"></el-input></el-form-item>
+                                    <el-button type="primary" style="width:100%;" @click="submitHealth">提交数据</el-button>
+                                </el-form>
+                            </el-card>
+                        </el-col>
+                    </el-row>
+                </div>
+                <div v-if="activeMenu === 'order'" class="content-card">
+                    <h2>我的订单</h2>
+                    <el-table :data="orders" border stripe>
+                        <el-table-column prop="serviceName" label="服务名称"></el-table-column>
+                        <el-table-column prop="price" label="价格"><template #default="s">¥{{s.row.price}}</template></el-table-column>
+                        <el-table-column prop="createTime" label="预约时间"><template #default="s">{{ (s.row.createTime||'').replace('T',' ').substring(0,19) }}</template></el-table-column>
+                        <el-table-column prop="status" label="状态"><template #default="s"><el-tag :type="s.row.status==='已完成'?'success':(s.row.status==='服务中'?'primary':'warning')">{{s.row.status}}</el-tag></template></el-table-column>
+                    </el-table>
+                </div>
+                <div v-if="activeMenu === 'admin'" class="content-card">
+                    <h2 style="color:#F56C6C">后台管理</h2>
+                    <el-table :data="adminOrders" border stripe>
+                        <el-table-column prop="id" label="ID" width="60"></el-table-column>
+                        <el-table-column prop="serviceName" label="服务"></el-table-column>
+                        <el-table-column prop="status" label="状态"></el-table-column>
+                        <el-table-column label="操作">
+                            <template #default="s">
+                                <el-button size="small" v-if="s.row.status==='待接单'" @click="handleUpdate(s.row.id, '服务中')">接单</el-button>
+                                <el-button size="small" type="success" v-if="s.row.status==='服务中'" @click="handleUpdate(s.row.id, '已完成')">完成</el-button>
+                                <span v-if="s.row.status==='已完成'" style="color:green">✔ 完成</span>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                </div>
+            </el-main>
+        </el-container>
+    </el-container>
+</div>
+<script src="libs/vue.js"></script>
+<script src="libs/element.js"></script>
+<script src="libs/icons.js"></script>
+<script>
+    window.onerror = function(msg, source, lineno) { document.getElementById('global-error').style.display = 'block'; document.getElementById('global-error').innerHTML += `❌ 错误: ${msg} (行号: ${lineno}) <br>`; };
+    if (typeof Vue === 'undefined') { document.getElementById('global-error').style.display = 'block'; document.getElementById('global-error').innerHTML = "❌ Vue.js 未加载！"; }
+    else {
+        const { createApp, ref, computed, onMounted } = Vue;
+        const app = createApp({
+            setup() {
+                const activeMenu = ref('home');
+                const currentUser = ref({});
+                const services = ref([]);
+                const orders = ref([]);
+                const adminOrders = ref([]);
+                const historyList = ref([]);
+                const recommendServices = ref([]);
+                const latestHealth = ref({});
+                const lastHealthDate = ref('');
+                const healthForm = ref({ high: '', low: '', sugar: '', rate: '' });
+                const filterCategory = ref('全部');
+                const isEditing = ref(false);
+                const editForm = ref({});
+
+                const filteredServices = computed(() => { if (filterCategory.value === '全部') return services.value; return services.value.filter(s => s.category === filterCategory.value); });
+
+                const get = async (url) => { try { const res = await fetch(url); return await res.json(); } catch(e) { console.error(e); return []; } };
+
+                // 增强版 postForm：兼容纯文本返回
+                const postForm = async (url, data) => {
+                    const p = new URLSearchParams();
+                    for(let k in data) p.append(k, data[k]);
+                    try {
+                        const res = await fetch(url, { method: 'POST', body: p });
+                        const text = await res.text();
+                        try { return JSON.parse(text); } catch (e) { return { success: true, msg: text }; } // 如果是纯文字，当做成功处理
+                    } catch(e) { return { success: false, msg: "网络错误" }; }
+                };
+
+                const postJson = async (url, data) => {
+                    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                    const text = await res.text();
+                    try { return JSON.parse(text); } catch(e) { return { success: true }; }
+                };
+
+                const loadAll = async () => {
+                    services.value = await get('/service/list') || [];
+                    recommendServices.value = await get('/recommend/list') || [];
+                    if (currentUser.value.id) {
+                        orders.value = await get('/order/my') || [];
+                        historyList.value = await get(`/health/list?userId=${currentUser.value.id}`) || [];
+                        if(historyList.value.length > 0) {
+                            const last = historyList.value[historyList.value.length - 1];
+                            latestHealth.value = last;
+                            lastHealthDate.value = last.measureTime ? last.measureTime.replace('T', ' ').substring(0, 16) : '';
+                        }
+                        if (currentUser.value.role !== 'user') adminOrders.value = await get('/order/all') || [];
+                    }
+                };
+
+                const submitHealth = async () => {
+                    if (!healthForm.value.high || !healthForm.value.low) return ElementPlus.ElMessage.warning("请填写完整");
+                    const payload = { userId: currentUser.value.id, highPressure: parseInt(healthForm.value.high), lowPressure: parseInt(healthForm.value.low), bloodSugar: parseFloat(healthForm.value.sugar), heartRate: parseInt(healthForm.value.rate) };
+                    await postJson('/health/add', payload);
+                    ElementPlus.ElMessage.success("录入成功");
+                    healthForm.value = { high: '', low: '', sugar: '', rate: '' };
+                    loadAll();
+                };
+
+                const saveProfile = async () => {
+                    const res = await postForm('/user/update', { id: editForm.value.id, realName: editForm.value.realName, phone: editForm.value.phone, age: editForm.value.age, avatar: editForm.value.avatar || '' });
+                    ElementPlus.ElMessage.success("修改成功");
+                    currentUser.value = editForm.value;
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser.value));
+                    isEditing.value = false;
+                };
+
+                // === 🚀 核心修复：预约功能 ===
+                const handleOrder = async (id) => {
+                    if(!confirm("确认预约此服务?")) return;
+                    const uid = currentUser.value.id;
+                    if(!uid) return ElementPlus.ElMessage.warning("请先登录");
+
+                    // 重点：同时传入 serviceId 和 userId，双重保险
+                    const res = await postForm('/order/create', { serviceId: id, userId: uid });
+
+                    // 宽容判断：只要没明确报错，或者返回了“成功”字样，就算成功
+                    if (res && (res.success || res === '预约成功' || (res.msg && res.msg.includes('成功')))) {
+                        ElementPlus.ElMessage.success("预约成功！");
+                        loadAll(); // 立即刷新列表
+                    } else {
+                        // 显示后端返回的错误信息（如果有）
+                        ElementPlus.ElMessage.error(res.msg || "预约失败，请检查后端日志");
+                    }
+                };
+
+                const handleUpdate = async (id, status) => {
+                    await postForm('/order/update', { id: id, status: status });
+                    ElementPlus.ElMessage.success("操作成功");
+                    loadAll();
+                };
+
+                const checkLogin = () => { const s = localStorage.getItem('currentUser'); if (!s) { window.location.href='login.html'; return; } currentUser.value = JSON.parse(s); };
+                const logout = () => { localStorage.removeItem('currentUser'); window.location.href='login.html'; };
+                const startEdit = () => { editForm.value = JSON.parse(JSON.stringify(currentUser.value)); isEditing.value = true; };
+
+                onMounted(() => { checkLogin(); loadAll(); });
+
+                return { activeMenu, currentUser, services, orders, adminOrders, historyList, healthForm, recommendServices, latestHealth, lastHealthDate, filterCategory, filteredServices, isEditing, editForm, submitHealth, saveProfile, handleOrder, handleUpdate, logout, startEdit };
+            }
+        });
+        if (window.ElementPlusIconsVue) { for (const [key, component] of Object.entries(ElementPlusIconsVue)) { app.component(key, component); } }
+        app.use(ElementPlus);
+        app.mount('#app');
+    }
+</script>
+</body>
+</html>

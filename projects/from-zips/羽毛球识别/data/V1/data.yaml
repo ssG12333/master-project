@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 7
+names: ['BackhandClear', 'BackhandLift', 'BackhandServe', 'ForehandClear', 'ForehandLift', 'ReadyPosition', 'Smash']
+
+roboflow:
+  workspace: badmintontutorkeypoints
+  project: badminton-pose-classify
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/badmintontutorkeypoints/badminton-pose-classify/dataset/1

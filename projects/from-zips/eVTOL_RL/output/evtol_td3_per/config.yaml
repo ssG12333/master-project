@@ -1,0 +1,160 @@
+agent_params:
+  gamma: 0.99
+  lr_actor: 3e-5
+  lr_critic: 3e-5
+  noise_clip: 0.5
+  policy_delay: 2
+  policy_noise: 0.2
+  tau: 0.005
+batch_size: 256
+buffer_size: 1000000
+environment:
+  action_dim: 4
+  air_density: 1.225
+  collision_distance_threshold: 10.0
+  evaluation:
+    num_episodes: 100
+    save_trajectories: true
+  induced_drag_factor: 0.04
+  lift_slope: 6.65
+  logging:
+    checkpoint_dir: checkpoints
+    log_level: INFO
+    tensorboard_dir: tensorboard
+  mass: 2653.0
+  max_alpha_deg: 90.0
+  max_altitude: 300.0
+  max_phi_deg: 60.0
+  max_range: 50000.0
+  max_speed: 100.0
+  max_thrust_cruise: 35000.0
+  max_thrust_lift: 47000.0
+  min_speed: 0.1
+  obstacles:
+    danger_zone_ratios:
+      BASIC_FLIGHT: 0.0
+      COMPLEX_NAV: 0.15
+      GENERALIZATION: 0.25
+      SIMPLE_NAV: 0.0
+    densities:
+      BASIC_FLIGHT: 0
+      COMPLEX_NAV: 6.0e-05
+      GENERALIZATION: 0.0001
+      SIMPLE_NAV: 2.0e-05
+    generation_margin: 50.0
+    height_params:
+      BASIC_FLIGHT:
+        alpha: 2.0
+        max: 50
+        min: 20
+      COMPLEX_NAV:
+        alpha: 2.0
+        max: 150
+        min: 20
+      GENERALIZATION:
+        alpha: 2.5
+        max: 300
+        min: 30
+      SIMPLE_NAV:
+        alpha: 2.0
+        max: 80
+        min: 20
+    max_placement_attempts: 20
+    min_physical_gaps:
+      BASIC_FLIGHT: 0
+      COMPLEX_NAV: 0.5
+      GENERALIZATION: 0.4
+      SIMPLE_NAV: 0.7
+    radius_params:
+      BASIC_FLIGHT:
+        alpha: 2.0
+        max: 30
+        min: 10
+      COMPLEX_NAV:
+        alpha: 2.0
+        max: 100
+        min: 10
+      GENERALIZATION:
+        alpha: 2.5
+        max: 200
+        min: 20
+      SIMPLE_NAV:
+        alpha: 2.0
+        max: 50
+        min: 10
+    safety_spacing_multipliers:
+      BASIC_FLIGHT: 0
+      COMPLEX_NAV: 1.5
+      GENERALIZATION: 1.0
+      SIMPLE_NAV: 2.0
+  parasitic_drag: 0.07
+  safety_distance_threshold: 25.0
+  state_dim: 15
+  target_radius: 15.0
+  transition_end_speed: 44.0
+  transition_start_speed: 20.0
+  wind:
+    direction_frequency: 0.3
+    direction_variation: 0.1
+    gust_factor:
+      coefficient_a: -5.0681
+      coefficient_b: 12.2611
+    intensity_params:
+      CALM:
+        base_speed: 3.0
+        gust_duration: 0.5
+        gust_start_time: 100.0
+        random_frequency: 0.1
+        random_max_amplitude: 0.2
+        wind_profile_exponent: 0.29
+      EXTREME:
+        base_speed: 25.0
+        gust_duration: 5.0
+        gust_start_time: 2.0
+        random_frequency: 1.0
+        random_max_amplitude: 3.0
+        wind_profile_exponent: 0.35
+      MODERATE:
+        base_speed: 10.0
+        gust_duration: 1.0
+        gust_start_time: 50.0
+        random_frequency: 0.3
+        random_max_amplitude: 0.8
+        wind_profile_exponent: 0.29
+      NORMAL:
+        base_speed: 6.0
+        gust_duration: 0.1
+        gust_start_time: 1000.0
+        random_frequency: 0.0
+        random_max_amplitude: 0.0
+        wind_profile_exponent: 0.29
+    primary_direction:
+    - 1.0
+    - 0.0
+    - 0.0
+    reference_height: 140.0
+    vertical_component_factor: 0.2
+    wind_profile_exponent: 0.29
+  wing_area: 17.0
+  wingspan: 14.5
+max_episode_steps: 1500
+max_episode_steps_per_stage:
+  BASIC_FLIGHT: 800
+  COMPLEX_NAV: 1500
+  GENERALIZATION: 2500
+  SIMPLE_NAV: 1000
+max_steps: 1000000
+output_dir: output/evtol_td3_per
+per_alpha: 0.6
+per_beta: 0.4
+per_beta_increment: 0.001
+save_freq: 100
+stage_progression:
+  BASIC_FLIGHT: 0.9
+  COMPLEX_NAV: 0.7
+  GENERALIZATION: null
+  SIMPLE_NAV: 0.9
+train_steps_per_cycle: 10000
+use_prioritized_replay: true
+validation_episodes_per_cycle: 100
+warmup_steps: 10000

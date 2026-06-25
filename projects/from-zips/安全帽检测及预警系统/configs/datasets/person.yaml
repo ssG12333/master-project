@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['person']
+
+roboflow:
+  workspace: 1-txx8f
+  project: -yitr6
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/1-txx8f/-yitr6/dataset/1

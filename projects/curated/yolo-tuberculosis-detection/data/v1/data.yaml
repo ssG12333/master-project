@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 5
+names: ['Pneumonia Bacteria', 'Pneumonia Virus', 'Sick', 'healthy', 'tuberculosis']
+
+roboflow:
+  workspace: 1-txx8f
+  project: my-first-project-c8no9-zftg9
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/1-txx8f/my-first-project-c8no9-zftg9/dataset/2

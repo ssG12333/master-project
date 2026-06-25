@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 3
+names: ['no helmet', 'helmet', 'person']
+
+roboflow:
+  workspace: joseph-nelson
+  project: hard-hat-workers
+  version: 10
+  license: Public Domain
+  url: https://universe.roboflow.com/joseph-nelson/hard-hat-workers/dataset/10

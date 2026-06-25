@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 3
+names: ['head', 'helmet', 'person']
+
+roboflow:
+  workspace: 1-txx8f
+  project: -6ktby
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/1-txx8f/-6ktby/dataset/2

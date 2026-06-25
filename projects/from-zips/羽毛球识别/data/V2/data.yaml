@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 6
+names: ['backhand-general', 'defense', 'lift', 'offense', 'serve', 'smash']
+
+roboflow:
+  workspace: main-mhjdn
+  project: badminton-pose-vuz9h
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/main-mhjdn/badminton-pose-vuz9h/dataset/2

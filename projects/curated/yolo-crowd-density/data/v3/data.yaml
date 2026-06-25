@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['people_counterv0 - v1 2023-05-18 6-22pm']
+
+roboflow:
+  workspace: 1-txx8f
+  project: -z1ivh
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/1-txx8f/-z1ivh/dataset/1

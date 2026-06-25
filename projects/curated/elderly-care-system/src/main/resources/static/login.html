@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>登录 - 智慧居家养老服务系统</title>
+    <link rel="stylesheet" href="libs/element.css">
+    <style>
+        body { margin: 0; padding: 0; background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); height: 100vh; display: flex; justify-content: center; align-items: center; font-family: "Microsoft YaHei", sans-serif; }
+        .login-card { width: 400px; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); background: rgba(255,255,255,0.95); }
+        .login-title { text-align: center; font-size: 24px; font-weight: bold; color: #409EFF; margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="login-card">
+        <div class="login-title">👵 智慧养老 · 登录</div>
+        <el-form label-position="top">
+            <el-form-item label="账号">
+                <el-input v-model="form.username" placeholder="请输入账号 (admin/caregiver/user)" prefix-icon="User"></el-input>
+            </el-form-item>
+            <el-form-item label="密码">
+                <el-input v-model="form.password" type="password" placeholder="请输入密码" prefix-icon="Lock" show-password @keyup.enter="handleLogin"></el-input>
+            </el-form-item>
+            <el-button type="primary" style="width: 100%; margin-top: 20px; height: 40px; font-size: 16px;" @click="handleLogin" :loading="loading">登 录</el-button>
+            <div style="text-align: center; margin-top: 15px;">
+                <el-link type="info" @click="toRegister">没有账号？去注册</el-link>
+            </div>
+        </el-form>
+    </div>
+</div>
+
+<script src="libs/vue.js"></script>
+<script src="libs/element.js"></script>
+<script src="libs/icons.js"></script>
+<script>
+    const { createApp, ref } = Vue;
+    const app = createApp({
+        setup() {
+            const form = ref({ username: '', password: '' });
+            const loading = ref(false);
+
+            const handleLogin = async () => {
+                if(!form.value.username || !form.value.password) return ElementPlus.ElMessage.warning("请输入账号和密码");
+
+                loading.value = true;
+                try {
+                    // 1. 构造表单数据 (适配后端 @RequestParam)
+                    const params = new URLSearchParams();
+                    params.append('username', form.value.username);
+                    params.append('password', form.value.password);
+
+                    // 2. 发送请求
+                    const res = await fetch('/user/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, // 关键！
+                        body: params
+                    });
+
+                    const result = await res.json();
+
+                    if (result.success) {
+                        ElementPlus.ElMessage.success("登录成功，正在跳转...");
+
+                        // 3. 存入缓存 (防脏数据)
+                        if (result.data) {
+                            localStorage.setItem('currentUser', JSON.stringify(result.data));
+                            // 延迟跳转，让用户看清提示
+                            setTimeout(() => { window.location.href = 'index.html'; }, 800);
+                        } else {
+                            throw new Error("返回数据异常");
+                        }
+                    } else {
+                        ElementPlus.ElMessage.error(result.msg || "登录失败");
+                    }
+                } catch (e) {
+                    console.error(e);
+                    ElementPlus.ElMessage.error("网络错误或服务器异常");
+                } finally {
+                    loading.value = false;
+                }
+            };
+
+            const toRegister = () => { window.location.href = 'register.html'; }; // 假设你有注册页，没有也没事
+
+            return { form, handleLogin, loading, toRegister };
+        }
+    });
+    app.use(ElementPlus);
+    if (window.ElementPlusIconsVue) for (const [key, component] of Object.entries(ElementPlusIconsVue)) app.component(key, component);
+    app.mount('#app');
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+Scenario,Distance (m),Nodes Expanded,Nodes Generated,Path Points,Time (s),Min Clearance (m),Efficiency (pts/s)
+Scenario 1 - Overtaking,10.32,162,477,416,0.859,1.340,484.4
+Scenario 2 - U-turn,19.50,158,460,758,1.202,1.207,630.8
+Scenario 3 - Turning Corner,17.50,193,648,675,6.025,1.242,112.0

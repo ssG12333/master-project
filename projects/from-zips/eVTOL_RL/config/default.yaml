@@ -1,0 +1,218 @@
+# eVTOL训练配置文件 - Lift+Cruise 控制
+
+training:
+  max_steps: 1000000
+  max_episode_steps: 1500  # 与环境一致
+  warmup_steps: 10000
+  batch_size: 256
+  buffer_size: 1000000
+  save_freq: 100  # 每100个episode保存一次
+
+  # 阶段自适应最大步数（优化训练效率）
+  max_episode_steps_per_stage:
+    BASIC_FLIGHT: 800        # 简单飞行，快速迭代
+    SIMPLE_NAV: 1000         # 稀疏障碍，中等任务
+    COMPLEX_NAV: 1500        # 中等障碍，复杂导航
+    GENERALIZATION: 2500     # 高密度障碍，极端场景
+
+
+  # 训练-验证循环配置
+  train_steps_per_cycle: 10000
+  validation_episodes_per_cycle: 100
+
+  # 优先经验回放(PER)配置
+  use_prioritized_replay: true
+  per_alpha: 0.6          # 优先级参数 (0=uniform, 1=greedy)
+  per_beta: 0.4           # 重要性采样参数
+  per_beta_increment: 0.001  # beta增长率
+
+agent_params:
+  lr_actor: 3e-5
+  lr_critic: 3e-5
+  gamma: 0.99
+  tau: 0.005
+  policy_noise: 0.2
+  noise_clip: 0.5
+  policy_delay: 2
+
+# 课程学习阶段成功率阈值
+stage_progression:
+  BASIC_FLIGHT: 0.9
+  SIMPLE_NAV: 0.9
+  COMPLEX_NAV: 0.7
+  GENERALIZATION: null  # 最终阶段，不再进阶
+
+# 环境配置
+environment:
+  # 状态空间维度：15D（与evtol_env.py一致）
+  state_dim: 15
+  # 动作空间维度：4D - [T_Lift, T_Cruise, α, φ] (Lift+Cruise模型)
+  action_dim: 4
+
+  # GUAM飞行器参数
+  mass: 2653.0  # kg
+  wingspan: 14.5  # m
+  wing_area: 17.0  # m²
+
+  # 飞行限制
+  max_speed: 100.0  # m/s (130 kts)
+  min_speed: 0.1   # m/s (与dynamics.py一致)
+  max_altitude: 300.0  # m
+  max_range: 50000.0  # m (50km)
+
+  # Lift+Cruise 推力限制
+  max_thrust_lift: 47000.0     # N (垂直旋翼最大推力)
+  max_thrust_cruise: 35000.0   # N (巡航螺旋桨最大推力)
+
+  # 角度限制
+  max_alpha_deg: 90.0   # 最大攻角（度）
+  max_phi_deg: 60.0     # 最大滚转角（度）
+
+  # 过渡速度参数
+  transition_start_speed: 20.0  # m/s (过渡开始速度)
+  transition_end_speed: 44.0    # m/s (过渡结束速度)
+
+  # 气动参数
+  lift_slope: 6.65                # 升力斜率 CL_α
+  parasitic_drag: 0.07         # 寄生阻力系数 CD0
+  induced_drag_factor: 0.04      # 诱导阻力因子 k
+  air_density: 1.225             # kg/m³
+
+  # 目标和安全配置
+  target_radius: 15.0
+  safety_distance_threshold: 25.0   # 用于计算安全覆盖率
+  collision_distance_threshold: 10.0
+
+  # 分析和日志配置
+  logging:
+    tensorboard_dir: "tensorboard"
+    checkpoint_dir: "checkpoints"
+    log_level: "INFO"
+
+  # 评估配置
+  evaluation:
+    num_episodes: 100
+    save_trajectories: true
+
+  # 障碍物生成配置
+  obstacles:
+    # 不同训练阶段的障碍物密度
+    densities:
+      BASIC_FLIGHT: 0              # 无障碍物
+      SIMPLE_NAV: 0.00002          # 稀疏
+      COMPLEX_NAV: 0.00006         # 中等密度
+      GENERALIZATION: 0.0001       # 高密度
+
+    # 障碍物高度参数 (幂律分布)
+    height_params:
+      BASIC_FLIGHT:
+        alpha: 2.0
+        min: 20
+        max: 50
+      SIMPLE_NAV:
+        alpha: 2.0
+        min: 20
+        max: 80
+      COMPLEX_NAV:
+        alpha: 2.0
+        min: 20
+        max: 150
+      GENERALIZATION:
+        alpha: 2.5
+        min: 30
+        max: 300
+
+    # 障碍物半径参数 (幂律分布)
+    radius_params:
+      BASIC_FLIGHT:
+        alpha: 2.0
+        min: 10
+        max: 30
+      SIMPLE_NAV:
+        alpha: 2.0
+        min: 10
+        max: 50
+      COMPLEX_NAV:
+        alpha: 2.0
+        min: 10
+        max: 100
+      GENERALIZATION:
+        alpha: 2.5
+        min: 20
+        max: 200
+
+    # 安全间距配置 (基于翼展的倍数)
+    safety_spacing_multipliers:
+      BASIC_FLIGHT: 0      # 无障碍物
+      SIMPLE_NAV: 2.0      # 宽松间距
+      COMPLEX_NAV: 1.5     # 中等间距
+      GENERALIZATION: 1.0  # 紧凑间距
+
+    # 危险区域比例（允许多少比例的间隙小于推荐安全间距）
+    danger_zone_ratios:
+      BASIC_FLIGHT: 0.0    # 无危险区域
+      SIMPLE_NAV: 0.0      # 无危险区域
+      COMPLEX_NAV: 0.15    # 15%的间隙可能是危险的
+      GENERALIZATION: 0.25 # 25%的间隙可能是危险的
+
+    # 最小物理间距（绝对不能小于此值，单位：翼展倍数）
+    min_physical_gaps:
+      BASIC_FLIGHT: 0
+      SIMPLE_NAV: 0.7      # 0.7×翼展（10.15m）
+      COMPLEX_NAV: 0.5     # 0.5×翼展（7.25m）
+      GENERALIZATION: 0.4  # 0.4×翼展（5.8m）
+
+    # 障碍物生成边界 (从区域边缘的最小距离)
+    generation_margin: 50.0  # m
+    max_placement_attempts: 20  # 每个障碍物的最大放置尝试次数
+
+  # 风场配置
+  wind:
+    # 基础风场参数
+    reference_height: 140.0  # m (参考高度 z0)
+    wind_profile_exponent: 0.29  # 风剖面指数 alpha
+
+    # 不同强度等级的风场参数
+    intensity_params:
+      CALM:  # 无风/微风 (对应 BASIC_FLIGHT)
+        base_speed: 3.0              # m/s (参考风速 v0)
+        wind_profile_exponent: 0.29  # 风剖面指数
+        gust_start_time: 100.0       # s (阵风起始时间)
+        gust_duration: 0.5           # s (阵风持续时间)
+        random_max_amplitude: 0.2    # m/s (随机扰动幅度)
+        random_frequency: 0.1        # Hz (随机扰动频率)
+
+      NORMAL:  # 正常风况 (对应 SIMPLE_NAV)
+        base_speed: 6.0
+        wind_profile_exponent: 0.29
+        gust_start_time: 1000.0      # 几乎不启动阵风
+        gust_duration: 0.1
+        random_max_amplitude: 0.0    # 无随机扰动
+        random_frequency: 0.0
+
+      MODERATE:  # 中等风况 (对应 COMPLEX_NAV)
+        base_speed: 10.0
+        wind_profile_exponent: 0.29
+        gust_start_time: 50.0
+        gust_duration: 1.0
+        random_max_amplitude: 0.8
+        random_frequency: 0.3
+
+      EXTREME:  # 极端风况 (对应 GENERALIZATION)
+        base_speed: 25.0
+        wind_profile_exponent: 0.35
+        gust_start_time: 2.0
+        gust_duration: 5.0
+        random_max_amplitude: 3.0
+        random_frequency: 1.0
+
+    # 风向配置
+    primary_direction: [1.0, 0.0, 0.0]  # 主风向 (X正方向)
+    direction_variation: 0.1             # 风向变化幅度
+    direction_frequency: 0.3             # 风向变化频率
+    vertical_component_factor: 0.2       # 垂直分量系数
+
+    # 阵风系数计算参数
+    gust_factor:
+      coefficient_a: -5.0681  # 阵风系数公式参数 a
+      coefficient_b: 12.2611  # 阵风系数公式参数 b

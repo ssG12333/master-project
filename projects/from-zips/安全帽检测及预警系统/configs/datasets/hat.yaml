@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 5
+names: ['Hardhat', 'NO-Hardhat', 'NO-Suit', 'Person', 'Suit']
+
+roboflow:
+  workspace: 1-txx8f
+  project: ppi-dev-safety-mxspe
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/1-txx8f/ppi-dev-safety-mxspe/dataset/2

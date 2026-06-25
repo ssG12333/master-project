@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['Landslides']
+
+roboflow:
+  workspace: amish-kumar
+  project: landslide_segmentation
+  version: 6
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/amish-kumar/landslide_segmentation/dataset/6

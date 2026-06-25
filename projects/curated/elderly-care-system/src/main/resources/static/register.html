@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>注册 - 智慧居家养老服务系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+    <style>
+        body { margin: 0; padding: 0; background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .register-card { width: 500px; padding: 25px; border-radius: 15px; background: rgba(255, 255, 255, 0.95); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); margin: 20px 0; }
+        .title { text-align: center; color: #626aef; margin-bottom: 20px; font-weight: bold; font-size: 24px; }
+        .reg-btn { width: 100%; font-size: 16px; padding: 12px; margin-top: 10px; }
+        /* 头像选择样式 */
+        .avatar-option { width: 50px; height: 50px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; transition: all 0.3s; }
+        .avatar-option:hover { transform: scale(1.1); }
+        .avatar-option.selected { border-color: #626aef; box-shadow: 0 0 10px rgba(98, 106, 239, 0.5); }
+    </style>
+</head>
+<body>
+<div id="app">
+    <el-card class="register-card">
+        <div class="title">📝 用户信息完善</div>
+
+        <el-form label-position="top" :model="form" :rules="rules" ref="ruleFormRef">
+
+            <el-row :gutter="20">
+                <el-col :span="12">
+                    <el-form-item label="账号" prop="username">
+                        <el-input v-model="form.username" placeholder="设置账号" prefix-icon="User"></el-input>
+                    </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                    <el-form-item label="密码" prop="password">
+                        <el-input v-model="form.password" type="password" placeholder="设置密码" prefix-icon="Lock" show-password></el-input>
+                    </el-form-item>
+                </el-col>
+            </el-row>
+
+            <el-row :gutter="20">
+                <el-col :span="12">
+                    <el-form-item label="真实姓名" prop="realName">
+                        <el-input v-model="form.realName" placeholder="如：张建国" prefix-icon="Postcard"></el-input>
+                    </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                    <el-form-item label="年龄" prop="age">
+                        <el-input v-model.number="form.age" placeholder="如：65" type="number" prefix-icon="Calendar"></el-input>
+                    </el-form-item>
+                </el-col>
+            </el-row>
+
+            <el-form-item label="联系电话" prop="phone">
+                <el-input v-model="form.phone" placeholder="方便社区联系您" prefix-icon="Iphone"></el-input>
+            </el-form-item>
+
+            <el-form-item label="选择头像">
+                <div style="display: flex; justify-content: space-between; padding: 0 10px;">
+                    <img v-for="(img, index) in avatarList" :key="index"
+                         :src="img"
+                         class="avatar-option"
+                         :class="{ selected: form.avatar === img }"
+                         @click="form.avatar = img">
+                </div>
+            </el-form-item>
+
+            <el-form-item label="注册身份" prop="role">
+                <el-radio-group v-model="form.role" style="width: 100%; display: flex; justify-content: space-between;">
+                    <el-radio label="user" border style="width: 45%; margin-right: 0;">老人/家属</el-radio>
+                    <el-radio label="provider" border style="width: 45%;">护工/服务员</el-radio>
+                </el-radio-group>
+            </el-form-item>
+
+            <el-button type="primary" color="#626aef" class="reg-btn" @click="handleRegister" :loading="loading" round>立即注册</el-button>
+        </el-form>
+
+        <div style="text-align: center; margin-top: 15px;">
+            <el-link type="info" href="login.html">已有账号？去登录</el-link>
+        </div>
+    </el-card>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://unpkg.com/element-plus"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="https://unpkg.com/@element-plus/icons-vue"></script>
+
+<script>
+    const { createApp, ref, reactive } = Vue;
+    const app = createApp({
+        setup() {
+            // 预设的一组头像 URL (使用了饿了么的免费图床)
+            const avatarList = [
+                'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
+                'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png',
+                'https://cube.elemecdn.com/9/c2/f0ee8a3c7c9638a54940382568c9dpng.png',
+                'https://cube.elemecdn.com/6/94/4d3ea53c084bad6931a56d5158a48jpeg.jpeg'
+            ];
+
+            const form = reactive({
+                username: '', password: '', realName: '',
+                role: 'user', age: '', phone: '',
+                avatar: avatarList[0] // 默认选中第一个
+            });
+            const loading = ref(false);
+            const ruleFormRef = ref();
+
+            const rules = {
+                username: [{ required: true, message: '必填', trigger: 'blur' }],
+                password: [{ required: true, message: '必填', trigger: 'blur' }],
+                realName: [{ required: true, message: '必填', trigger: 'blur' }],
+                age: [{ required: true, message: '必填', trigger: 'blur' }],
+                phone: [{ required: true, message: '必填', trigger: 'blur' }]
+            };
+
+            const handleRegister = async () => {
+                if (!ruleFormRef.value) return;
+                await ruleFormRef.value.validate((valid) => {
+                    if (valid) submitRegister();
+                    else ElementPlus.ElMessage.warning("请填写完整信息");
+                });
+            };
+
+            const submitRegister = () => {
+                loading.value = true;
+                const params = new URLSearchParams();
+                // 追加所有参数
+                for(let key in form) { params.append(key, form[key]); }
+
+                axios.post('/user/register', params)
+                    .then(res => {
+                        loading.value = false;
+                        if(res.data.success) {
+                            ElementPlus.ElMessage.success("注册成功！");
+                            setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+                        } else {
+                            ElementPlus.ElMessage.error(res.data.msg);
+                        }
+                    })
+                    .catch(err => {
+                        loading.value = false;
+                        ElementPlus.ElMessage.error("错误：" + err);
+                    });
+            };
+
+            return { form, rules, ruleFormRef, handleRegister, loading, avatarList };
+        }
+    });
+    for (const [key, component] of Object.entries(ElementPlusIconsVue)) { app.component(key, component) }
+    app.use(ElementPlus);
+    app.mount('#app');
+</script>
+</body>
+</html>

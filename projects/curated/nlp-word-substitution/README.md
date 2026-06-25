@@ -24,7 +24,7 @@ def load_student_module(zid_name):
     模块必须定义: transform_sentence(sentence, source_level, target_level)"""
 ```
 
-### 核心替换逻辑 (`Z5519231.py`)
+### 核心替换逻辑 (`test.py` / `word_substitution.py`)
 
 ```python
 def transform_sentence(sentence: str, source_level: str, target_level: str) -> str:
@@ -79,6 +79,6 @@ python test.py   # 单元测试
 | 文件 | 说明 |
 |------|------|
 | `main.py` | 主入口 + 测试框架 + 模块加载 |
-| `Z5519231.py` | transform_sentence 核心实现 |
+| `test.py` / `word_substitution.py` | transform_sentence 核心实现 (词级统计 + CEFR 定级 + 替换管线) |
 | `test.py` | 单元测试与边界情况 |
 | `requirements.txt` | 依赖清单 |

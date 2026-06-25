@@ -2,46 +2,90 @@
 
 ## 项目简介
 
-本项目是一个面向医院日常业务的前后端分离管理系统，覆盖管理员、医生、患者三类角色。系统实现了用户登录、医生管理、患者管理、挂号预约、床位管理、药品管理、检查项目管理、订单统计和数据可视化等功能。
+前后端分离的医院信息管理系统（HIS），覆盖管理员、医生、患者三类角色。技术栈为 Spring Boot + MyBatis Plus + MySQL + Vue2 + Element UI + ECharts + JWT 认证。
 
-原始目录：`医院管理系统/医院管理系统/源码/`
+## 代码架构
+
+### 后端 (`backend/`)
+
+```java
+// Spring Boot 2.x + MyBatis Plus + MySQL 8.0
+
+// 入口
+BackendApplication.java                    // @SpringBootApplication
+
+// 通用组件
+common/R.java                              // 统一响应封装 (code, msg, data)
+config/JwtInterceptor.java                 // JWT Token 拦截验证
+config/InterceptorConfig.java              // 拦截器注册 + 白名单配置
+config/MyBatisPlusConfig.java              // MyBatis Plus 分页插件配置
+
+// 业务 Controller (各模块 REST API)
+controller/AdminUserController.java        // 管理员 CRUD
+controller/DoctorController.java           // 医生管理
+controller/PatientController.java          // 患者管理
+controller/ArrangeController.java          // 挂号预约排班
+controller/BedController.java              // 床位管理
+controller/MedicineController.java         // 药品管理 (库存、处方)
+controller/CheckController.java            // 检查项目管理
+controller/OrderController.java            // 订单统计
+controller/StatisticsController.java       // ECharts 数据可视化接口
+
+// Service → Mapper (MyBatis Plus BaseMapper)
+service/ → mapper/
+```
+
+### 前端 (`前端/`)
+
+```
+Vue2 + Element UI + Vue Router + Axios + ECharts
+
+路由结构:
+  /login          → 登录页 (JWT Token 存储)
+  /admin/dashboard → 管理员仪表盘 (ECharts 统计面板)
+  /admin/doctor    → 医生管理 (CRUD 表格)
+  /admin/patient   → 患者管理
+  /doctor/schedule → 医生排班
+  /doctor/patient  → 就诊记录
+  /patient/register→ 患者挂号
+  /patient/order   → 订单查询
+
+核心组件:
+  - JWT 认证: 登录 → 获取 Token → Axios 拦截器自动附加
+  - ECharts: 就诊量折线图、科室占比饼图、收入统计柱状图
+  - Element UI: 表格分页、表单验证、对话框确认
+```
 
 ## 技术栈
 
-- 后端：Spring Boot 2.2.4, Java 8, MyBatis, MyBatis Plus
-- 前端：Vue 2, Vue Router, Element UI, Axios, ECharts
-- 数据库：MySQL
-- 认证与工具：JWT, Lombok, Hutool, EasyPOI, iText
+| 层级 | 技术 |
+|------|------|
+| 后端框架 | Spring Boot 2.x, MyBatis Plus, MySQL 8.0 |
+| 安全 | JWT (JSON Web Token) 无状态认证 |
+| 前端 | Vue2, Element UI, Vue Router, Axios |
+| 可视化 | ECharts (仪表盘统计图表) |
+| 构建 | Maven (pom.xml) |
 
-## 主要功能
+## 运行方式
 
-- 多角色登录与路由权限控制。
-- 管理员维护医生、患者、药品、床位、检查项目和订单。
-- 患者进行科室查询、医生选择、挂号预约、住院床位查看。
-- 医生处理当天订单、复诊订单、住院安排等业务。
-- 使用 ECharts 展示挂号人数、性别、科室、费用等统计信息。
-- 支持 PDF 和 Excel 相关数据导出能力。
+```bash
+# 后端
+cd backend
+mvn clean install
+java -jar target/hospital-*.jar
 
-## 工作链路
+# 前端
+cd 前端
+npm install
+npm run serve
+```
 
-1. 前端 Vue 页面通过 Axios 调用后端 REST 接口。
-2. 后端 Controller 接收请求并完成参数校验。
-3. Service 层处理医生、患者、挂号、床位、药品等业务逻辑。
-4. Mapper 层通过 MyBatis Plus 访问 MySQL。
-5. 登录后使用 JWT 和前端路由守卫控制页面访问。
-6. 统计接口返回聚合数据，由 ECharts 渲染可视化图表。
+## 关键文件
 
-## 知识点
-
-- Spring Boot REST API 设计。
-- MyBatis Plus 数据访问与分页查询。
-- JWT 登录态和前端路由守卫。
-- Vue2 组件化页面开发。
-- Element UI 表单、表格、弹窗和后台布局。
-- ECharts 数据可视化。
-
-## 后续清理
-
-- 抽取数据库初始化 SQL。
-- 删除本地 IDE 配置和测试图片冗余资源。
-- 补充系统截图、接口列表和部署说明。
+| 文件 | 说明 |
+|------|------|
+| `backend/pom.xml` | Maven 依赖 (Spring Boot, MyBatis Plus, JWT, MySQL) |
+| `backend/src/main/java/com/shanzhu/hospital/BackendApplication.java` | 应用入口 |
+| `backend/.../config/JwtInterceptor.java` | JWT 拦截器 |
+| `backend/.../config/MyBatisPlusConfig.java` | MyBatis Plus 分页配置 |
+| `backend/.../controller/` | 全业务 Controller (10+ 模块) |

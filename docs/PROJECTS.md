@@ -25,13 +25,19 @@
 | 区块链拜占庭共识 | `区块链拜占庭/` | 分布式系统/区块链 | Python, PBFT/MVBC, Hash-DAC, Merkle Tree, matplotlib | 拜占庭节点仿真、数据可用性证明、性能统计 |
 | 随机森林交通事故预测 | `随机森林事故预测/` | 机器学习预测 | pandas, scikit-learn, RandomForestRegressor, seaborn | 事故时间序列、类别编码、预测评估和可视化 |
 | 数学建模竞赛合集 | `2025国赛数学建模/`, `2025校赛数学建模/`, `2026校赛数学建模/` | 数学建模竞赛 | Python, PyTorch, CEEMDAN, Ridge/SVR, RLlib, DQN/SAC/DDPG, TFT, GAT, XGBoost | 传感器数据校正、边坡监测、社交媒体预测、双轨方法论(Baseline+Advanced) |
+| 路径规划算法合集 | `my_DQN/`, `基于韧性评估的路径规划/`, `图书馆多维路径规划/` | 路径规划变体 | DQN, Q-Learning, A*, Dijkstra, 多目标优化 | DQN 变体、韧性评估 Q-Learning、图书馆多维路径多策略对比 |
+| 数据分析与可视化合集 | `天气预测/`, `音乐预测/`, `画表/`, `深度学习推理/` | 数据分析与可视化 | BP 神经网络, scikit-learn, matplotlib, seaborn, PyTorch | 天气预测、音乐特征分析、学术箱线图/柱状图、模型推理 |
+| 多智能体路径规划仿真 | `D:\010\master\code\MultiAgentPathFinding\` | MAPF 路径规划 | JavaScript, p5.js, CBS, A*, HTML5 Canvas | 本科毕设，CBS 冲突搜索 + A* + p5.js 可视化，在线 Demo |
+| Azul 棋盘游戏 RL 智能体 | `D:\010\master\code\azul-code\` | 博弈论/RL | Python, DQN, Minimax, Pygame, Docker | COMP90054 课程，DQN 自对弈训练 + Minimax + α-β 剪枝 |
+| 多智能体 RL 算法合集 | `D:\010\master\code\dqn\` | 多智能体强化学习 | PyTorch, SAC, PPO, MADDPG, MAPPO, MASAC, IPPO | 多算法横向对比，CTDE 架构，连续/离散动作空间 |
 
 ## 可合并展示
 
 | 合并主题 | 涉及目录 | 整合建议 |
 | --- | --- | --- |
 | YOLO 应用合集 | `260313yolo（复件）`, `ultralytics`, `yolo改`, zip 中的安全帽/车道线/山体滑坡/羽毛球识别 | 不上传完整框架，按应用场景写成多个 README 或一个 YOLO 专题页 |
-| 路径规划算法合集 | `my_DQN`, `ppo路径规划`, `改dqn`, `基于韧性评估的路径规划`, `图书馆多维路径规划` | 已抽取 DQN 与 Hybrid A* 作为代表项目，其余按 DQN/PPO/Q-learning/A* 分章节整理 |
+| 路径规划算法合集 | `my_DQN`, `ppo路径规划`, `改dqn`, `基于韧性评估的路径规划`, `图书馆多维路径规划` | 已抽取 DQN、Hybrid A* 为代表项目，其余汇总为 [路径规划算法合集](../projects/curated/path-planning-collection/README.md) |
+| 数据预测合集 | `天气预测`, `音乐预测`, `画表`, `深度学习推理` | 已汇总为 [数据分析与可视化合集](../projects/curated/data-analysis-collection/README.md) |
 | 数据预测合集 | `天气预测`, `音乐预测`, `数学建模`, `画表` | 已抽取股票预测和事故预测作为代表项目，其余可整合成数据分析和建模案例集 |
 | NLP 基础项目 | `情感分析`, `自然语言处理词义替换` | 已作为重点项目保留，后续可拆成 NLP 专题仓库 |
 

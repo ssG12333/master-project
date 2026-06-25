@@ -25,3 +25,8 @@
 | [区块链拜占庭共识仿真](blockchain-byzantine-consensus/README.md) | 分布式系统/区块链 | PBFT/MVBC、Hash-DAC、Merkle Proof、性能统计 |
 | [随机森林交通事故预测](accident-random-forest-forecasting/README.md) | 机器学习预测 | 事故时间序列、随机森林、特征编码、可视化评估 |
 | [数学建模竞赛合集](math-modeling-competitions/README.md) | 数学建模竞赛（3 场） | 传感器校正、边坡监测、社交媒体预测、CEEMDAN/RL/DL 双轨方案 |
+| [路径规划算法合集](path-planning-collection/README.md) | 路径规划变体补充 | DQN 变体、Q-Learning 韧性评估、A*/Dijkstra 多策略图书馆路径 |
+| [数据分析与可视化合集](data-analysis-collection/README.md) | 数据预测与图表 | BP 天气预测、音乐分析、学术箱线图/柱状图、深度学习推理 |
+| [多智能体路径规划仿真](multi-agent-path-finding/README.md) | MAPF/CBS 路径规划 | CBS 冲突搜索、A*、p5.js 可视化、多 AGV 仿真 |
+| [Azul 棋盘游戏 RL 智能体](azul-rl-agent/README.md) | 博弈论/RL | DQN 自对弈训练、Minimax+α-β 剪枝、ELO 锦标赛 |
+| [多智能体 RL 算法合集](multi-agent-rl-collection/README.md) | 多智能体强化学习 | MASAC/MADDPG/MAPPO/IPPO/DQN 多算法对比 |

@@ -2,52 +2,83 @@
 
 ## 项目简介
 
-本项目实现拜占庭容错共识仿真，包括节点签名验证、承诺广播、Prepare/Commit 阶段、数据可用性证明和性能统计。项目适合展示分布式系统、区块链共识、哈希承诺和实验仿真能力。
+基于 Python 的多值拜占庭共识协议（MVBC）仿真。核心协议 Hash-DAC 通过数据可用性委员会（DAC）+ Merkle Tree 证明 + Reed-Solomon 纠删码，实现在 f 个拜占庭节点下的安全共识，避免反复传输完整原始数据。
 
-原始目录：`区块链拜占庭/`
+## 代码架构
+
+### Hash-DAC 共识协议 (`mvbc_hash_dac.py`)
+
+```python
+# 安全假设: N >= 3f + 1, 最多 f 个拜占庭节点
+# CandidateID = (proposer, value_hash, merkle_root, data_len, N, f, threshold)
+
+# 协议阶段:
+#   PROPOSE: 提议者 → CandidateID + Reed-Solomon 纠删码分片
+#   PREPARE:  节点验证 Hash 承诺 + Merkle Proof → 投票
+#   COMMIT:   收集 2f+1 Prepare 投票 → 锁定 CandidateID
+#   DECIDE:   纠删码恢复 (任意 k 个有效分片) → Hash 验证一致性
+
+# 有限域运算 (GF(257)):
+def mod_inv(a):       # 模逆: pow(a, PRIME-2, 257)
+def gf_eval_poly(c,x):# 多项式求值 → Reed-Solomon 编码
+def lagrange_interpolate(points): # 拉格朗日插值 → 纠删码恢复
+```
+
+### Merkle Tree 数据可用性证明
+
+```
+原始数据 → 分块 [b0, b1, ..., bk-1]
+  → sha256 叶节点 → 逐层配对 hash → Merkle Root
+Merkle Proof: 叶节点 + 兄弟路径 hash 链
+验证: proof + leaf_hash → recompute root → == merkle_root ?
+```
+
+### 纠删码 (Reed-Solomon over GF(257))
+
+```python
+# 编码: k 块数据 → n 块编码 (容忍 n-k 丢失)
+#   coeffs = [data[i] for i in range(k)]
+#   shards[i] = gf_eval_poly(coeffs, i+1)  # i ∈ [0, n)
+#
+# 恢复: 任意 k 个有效分片 → 拉格朗日插值多项式 → 原始数据
+```
+
+### 拜占庭行为模拟
+
+- **错误分片**: 发送被篡改/随机分片数据
+- **矛盾投票**: 对同一轮发送不同的 Prepare/Commit
+- **静默**: 故意不投票，测试 liveness
+- **伪造证明**: 发送错误的 Merkle Proof
+
+### PBFT 对比仿真 (`basic_consensus_simulation.py`)
+
+```python
+# 模拟签名: sha256(secret || message) → 真实系统应替换为 Ed25519
+# 三阶段: Pre-Prepare → Prepare → Commit
+# 性能对比指标: 吞吐量, 通信消息数, 延迟 (共识达成时间)
+```
 
 ## 技术栈
 
-- Python
-- hashlib, dataclasses
-- Merkle Tree
-- Reed-Solomon 编码思路
-- PBFT/MVBC 共识流程
-- matplotlib 性能可视化
+| 类别 | 技术 |
+|------|------|
+| 共识协议 | Hash-DAC, PBFT, MVBC |
+| 密码学 | SHA-256, 模拟签名, Merkle Tree + Proof |
+| 纠删码 | Reed-Solomon GF(257) |
+| 拜占庭模型 | f < N/3, 任意行为 (错误/矛盾/静默/伪造) |
 
-## 主要功能
+## 运行方式
 
-- 模拟诚实节点和拜占庭节点。
-- 使用哈希和签名模拟消息认证。
-- 实现承诺广播、提案、Prepare、Commit 和恢复流程。
-- 构建 Hash-DAC 数据可用性证书。
-- 使用 Merkle Proof 验证分片可用性。
-- 输出吞吐、通信量、成功率等性能指标图。
-
-## 工作链路
-
-1. 初始化节点集合、拜占庭节点比例和候选值。
-2. 通过哈希承诺和签名完成消息认证。
-3. 广播候选值分片并构建数据可用性证明。
-4. 节点收集阈值签名或投票后进入共识阶段。
-5. 对候选值执行 PBFT/MVBC 类流程。
-6. 汇总多轮实验指标并绘制性能图。
-
-## 知识点
-
-- 拜占庭容错和阈值假设。
-- 哈希承诺、签名和 Merkle Proof。
-- 数据可用性证书。
-- PBFT/MVBC 共识阶段。
-- 分布式系统实验仿真和指标统计。
+```bash
+pip install numpy matplotlib
+python mvbc_hash_dac.py              # Hash-DAC 协议完整仿真
+python basic_consensus_simulation.py # PBFT 对比实验
+```
 
 ## 关键文件
 
-- `basic_consensus_simulation.py`：基础共识流程和性能图表。
-- `mvbc_hash_dac.py`：Hash-DAC/MVBC 仿真实现。
-- `consensus_performance.png`：共识算法性能示例图。
-
-## 整理说明
-
-- 已移除 IDE 配置和缓存。
-- 当前目录保留两套核心仿真实现和性能图。
+| 文件 | 说明 |
+|------|------|
+| `mvbc_hash_dac.py` | Hash-DAC 协议: CandidateID + RS编码 + Merkle + 共识 |
+| `basic_consensus_simulation.py` | PBFT 风格三阶段共识对比 |
+| `consensus_performance.png` | 共识协议性能对比图 |

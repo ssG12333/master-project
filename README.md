@@ -20,7 +20,10 @@
 - [DQN 路径规划与可视化系统](projects/curated/dqn-path-planning/README.md)
 - [Hybrid A* 泊车路径规划仿真](projects/curated/hybrid-a-star-path-planning/README.md)
 - [PPO 二阶旋转倒立摆控制](projects/curated/ppo-rotary-pendulum-control/README.md)
-- PPO 路径规划、韧性评估路径规划、图书馆多维路径规划等项目已归入算法实验类。
+- [路径规划算法合集](projects/curated/path-planning-collection/README.md)（DQN 变体、Q-Learning 韧性、A*/Dijkstra 多策略）
+- [多智能体路径规划仿真系统 (MAPF/CBS)](projects/curated/multi-agent-path-finding/README.md)（本科毕设，CBS + A* + p5.js 可视化）
+- [多智能体强化学习算法合集](projects/curated/multi-agent-rl-collection/README.md)（MASAC/MADDPG/MAPPO/IPPO 对比）
+- 强化学习对抗 (1v1 源代码) 等项目已归入强化学习实验类。
 
 ### Web 管理系统
 
@@ -33,13 +36,14 @@
 - [股票预测与回测分析](projects/curated/stock-forecasting/README.md)
 - [随机森林交通事故预测](projects/curated/accident-random-forest-forecasting/README.md)
 - [数学建模竞赛合集（国赛 + 校赛）](projects/curated/math-modeling-competitions/README.md)
-- 天气预测、音乐预测、可视化绘图等项目已归入数据建模类。
+- [数据分析与可视化合集](projects/curated/data-analysis-collection/README.md)（BP 天气预测、音乐分析、学术图表）
 
 ### 自然语言处理与其他
 
 - [自然语言处理词义替换工具](projects/curated/nlp-word-substitution/README.md)
 - [BiLSTM 情感分析模型](projects/curated/sentiment-analysis/README.md)
 - [区块链拜占庭共识仿真](projects/curated/blockchain-byzantine-consensus/README.md)
+- [Azul 棋盘游戏 DQN 智能体](projects/curated/azul-rl-agent/README.md)（COMP90054 AI 课程，DQN + Minimax 博弈）
 - 符合性验证工具等项目作为补充项目整理。
 
 ## 整理原则
@@ -63,5 +67,5 @@
 - 已链接远程仓库：`https://github.com/ssG12333/-.git`
 - 已建立 Git 白名单，默认忽略原始大文件和重复资料。
 - 已将非重复 zip 过滤解压到 `projects/from-zips/`，并二次裁剪第三方框架副本、训练数据和批量输出。
-- 已将 18 个重点项目的核心源码和配置抽取到 `projects/curated/`。
+- 已将 24 个重点项目的核心源码和配置抽取到 `projects/curated/`（含 18 个独立项目 + 3 个合集 + 3 个外部项目）。
 - 已为重点项目和 zip 项目补充 README，重点突出技术栈、工作链路和技术方向。

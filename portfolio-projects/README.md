@@ -23,3 +23,8 @@
 - [区块链拜占庭共识仿真](blockchain-byzantine-consensus/README.md)
 - [随机森林交通事故预测](accident-random-forest-forecasting/README.md)
 - [数学建模竞赛合集](math-modeling-competitions/README.md)
+- [路径规划算法合集（补充变体）](../projects/curated/path-planning-collection/README.md)
+- [数据分析与可视化合集](../projects/curated/data-analysis-collection/README.md)
+- [多智能体路径规划仿真 (MAPF/CBS)](../projects/curated/multi-agent-path-finding/README.md)
+- [Azul 棋盘游戏 DQN 智能体](../projects/curated/azul-rl-agent/README.md)
+- [多智能体强化学习算法合集](../projects/curated/multi-agent-rl-collection/README.md)

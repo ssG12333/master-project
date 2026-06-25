@@ -1,0 +1,569 @@
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+import pandas as pd
+import os
+import random
+import traceback
+from collections import deque  # 用于经验回放缓冲区
+from tqdm import tqdm
+
+# 从 environment.py 导入环境类和全局常量
+from environment import MultiAgentPathPlanningEnv, OBSTACLES, PURE_WALKABLE_COORDS, GOAL_COORDS, MAP_BOUNDS, MAP_ROWS, \
+    MAP_COLS, DEVICE, AGENT_RADIUS
+# 从 masac_network.py 导入 MASAC 网络
+from masac_network import MASACActor, MASACCritic, LOG_SIG_MAX, LOG_SIG_MIN
+# 从 utils.py 导入辅助函数
+from utils import get_gpu_memory_usage, save_multi_agent_path_plot, save_training_plots
+
+# MASAC 训练结果和模型保存目录
+MASAC_DIR = "MASAC_Results1"
+if not os.path.exists(MASAC_DIR):
+    os.makedirs(MASAC_DIR)
+    print(f"创建目录: {MASAC_DIR}")
+
+
+# 经验回放缓冲区 (与 MADDPG 相同)
+class ReplayBuffer:
+    def __init__(self, capacity):
+        """
+        经验回放缓冲区。
+        capacity: 缓冲区最大容量。
+        """
+        self.buffer = deque(maxlen=capacity)
+
+    def push(self, local_state, global_state, action, reward, next_local_state, next_global_state, done):
+        """
+        向缓冲区添加一条经验。
+        """
+        self.buffer.append((local_state, global_state, action, reward, next_local_state, next_global_state, done))
+
+    def sample(self, batch_size):
+        """
+        从缓冲区随机采样一个批次的经验。
+        返回:
+            tuple: 包含批次数据的元组 (local_states, global_states, actions, rewards, next_local_states, next_global_states, dones)。
+        """
+        batch = random.sample(self.buffer, batch_size)
+        local_states, global_states, actions, rewards, next_local_states, next_global_states, dones = zip(*batch)
+        return (np.array(local_states), np.array(global_states), np.array(actions),
+                np.array(rewards), np.array(next_local_states), np.array(next_global_states), np.array(dones))
+
+    def __len__(self):
+        """
+        返回缓冲区当前大小。
+        """
+        return len(self.buffer)
+
+
+# MASAC 训练器
+class MASACTrainer:
+    def __init__(self, env, device, num_agents):
+        """
+        MASAC 训练器。
+        env: 环境实例。
+        device: PyTorch 设备 (CPU/CUDA)。
+        num_agents: 代理数量。
+        """
+        self.env = env
+        self.device = device
+        self.num_agents = num_agents
+
+        # 计算局部状态维度和全局状态维度
+        other_agents_info_dim = 3 * (self.num_agents - 1) if self.num_agents > 1 else 0
+        self.local_state_dim = 2 + 2 + 1 + self.env.num_rays + other_agents_info_dim
+        self.action_dim = 2  # 动作维度 (vx, vy)
+        self.global_state_dim = self.local_state_dim * self.num_agents
+        self.total_action_dim = self.action_dim * self.num_agents
+
+        # Actor 和 Critic 网络列表
+        self.actors = [MASACActor(self.local_state_dim, self.action_dim).to(device) for _ in range(num_agents)]
+        # Critic 接收全局状态和所有代理的动作，以及单个代理的局部状态维度用于内部嵌入
+        self.critics = [
+            MASACCritic(self.global_state_dim, self.total_action_dim, self.num_agents, self.local_state_dim).to(device)
+            for _ in range(num_agents)]
+
+        # 目标 Critic 网络列表
+        self.target_critics = [
+            MASACCritic(self.global_state_dim, self.total_action_dim, self.num_agents, self.local_state_dim).to(device)
+            for _ in range(num_agents)]
+
+        # 优化器列表
+        self.actor_optimizers = [optim.Adam(actor.parameters(), lr=0.0003) for actor in self.actors]
+        self.critic_optimizers = [optim.Adam(critic.parameters(), lr=0.0003) for critic in self.critics]
+
+        # SAC 的温度参数 (alpha)
+        # log_alphas 是 nn.Parameter 对象列表
+        self.log_alphas = [nn.Parameter(torch.zeros(1, device=device)) for _ in range(num_agents)]
+        self.alpha_optimizers = [optim.Adam([log_alpha], lr=0.0003) for log_alpha in self.log_alphas]
+        # 目标熵，用于自动调整 alpha
+        self.target_entropy = -torch.prod(torch.Tensor([self.action_dim]).to(device)).item()
+
+        # 初始化目标网络与当前网络相同
+        self.update_target_networks(tau=1.0)
+
+        # 经验回放缓冲区
+        self.replay_buffer = ReplayBuffer(capacity=int(1e6))  # 缓冲区容量
+        self.batch_size = 2048  # 训练批处理大小
+        self.gamma = 0.99  # 折扣因子
+        self.tau = 0.005  # 目标网络软更新参数
+
+        self.best_avg_reward = -float('inf')  # 用于保存最佳模型
+
+    def update_target_networks(self, tau=None):
+        """
+        更新目标 Critic 网络参数。
+        tau: 软更新参数 (0 < tau <= 1)。如果 tau=1，则硬更新。
+        """
+        if tau is None:
+            tau = self.tau
+        for i in range(self.num_agents):
+            for target_param, param in zip(self.target_critics[i].parameters(), self.critics[i].parameters()):
+                target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
+
+    def select_action(self, local_state, agent_idx, explore=True):
+        """
+        根据当前局部状态选择一个动作。
+        local_state: 单个代理的局部观测状态 (NumPy 数组)。
+        agent_idx: 代理索引。
+        explore: 是否从策略中采样 (True) 或选择均值 (False)。
+        返回:
+            action (np.array): 选择的动作。
+        """
+        self.actors[agent_idx].eval()  # 设置为评估模式
+        with torch.no_grad():
+            local_state_tensor = torch.FloatTensor(local_state).unsqueeze(0).to(self.device)
+            if explore:
+                action, _, _ = self.actors[agent_idx].sample(local_state_tensor)
+            else:
+                mean, _ = self.actors[agent_idx].forward(local_state_tensor)
+                action = torch.tanh(mean)  # 测试时直接使用均值并通过tanh
+            action = action.cpu().numpy().flatten()
+        self.actors[agent_idx].train()  # 恢复训练模式
+        return action
+
+    def train_step(self):
+        """
+        执行一个 MASAC 训练步骤。
+        从回放缓冲区采样，更新 Actor、Critic 和 Alpha。
+        """
+        if len(self.replay_buffer) < self.batch_size:
+            return 0.0, 0.0, 0.0  # 如果缓冲区数据不足，不进行训练
+
+        # 从回放缓冲区采样
+        local_states, global_states, actions, rewards, next_local_states, next_global_states, dones = \
+            self.replay_buffer.sample(self.batch_size)
+
+        # 转换为 PyTorch 张量
+        local_states_tensor = torch.FloatTensor(local_states).to(self.device)
+        global_states_tensor = torch.FloatTensor(global_states).to(self.device)
+        actions_tensor = torch.FloatTensor(actions).to(self.device)
+        # 修正: rewards_tensor 和 dones_tensor 不再需要 unsqueeze(1)
+        rewards_tensor = torch.FloatTensor(rewards).to(self.device)  # 形状: [batch_size, num_agents]
+        next_local_states_tensor = torch.FloatTensor(next_local_states).to(self.device)
+        next_global_states_tensor = torch.FloatTensor(next_global_states).to(self.device)
+        dones_tensor = torch.FloatTensor(dones).to(self.device)  # 形状: [batch_size, num_agents]
+
+        critic_loss_total = 0.0
+        actor_loss_total = 0.0
+        alpha_loss_total = 0.0
+
+        # 对每个代理进行训练
+        for i in range(self.num_agents):
+            agent_local_states = local_states_tensor[:, i * self.local_state_dim:(i + 1) * self.local_state_dim]
+            # agent_actions = actions_tensor[:, i*self.action_dim:(i+1)*self.action_dim] # 这行不再直接使用，因为 actions_tensor 整体传入 critic
+            agent_rewards = rewards_tensor[:, i]
+            agent_dones = dones_tensor[:, i]
+
+            # --- 更新 Critic 网络 ---
+            self.critic_optimizers[i].zero_grad()
+
+            with torch.no_grad():
+                # 使用当前 Actor 网络生成下一个动作 (用于计算目标 Q 值)
+                next_actions_all_agents = []
+                for j in range(self.num_agents):
+                    next_agent_local_state = next_local_states_tensor[:,
+                                             j * self.local_state_dim:(j + 1) * self.local_state_dim]
+                    next_action_j, next_log_prob_j, _ = self.actors[j].sample(next_agent_local_state)
+                    next_actions_all_agents.append(next_action_j)
+                next_all_actions_tensor = torch.cat(next_actions_all_agents, dim=1)
+
+                # 使用目标 Critic 网络评估下一个状态-动作对的 Q 值
+                target_q1_next, target_q2_next = self.target_critics[i](next_global_states_tensor,
+                                                                        next_all_actions_tensor)
+                target_q_next = torch.min(target_q1_next, target_q2_next) - self.log_alphas[
+                    i].exp() * next_log_prob_j  # SAC 的目标 Q 值
+
+                # 计算目标值
+                # 修正: agent_rewards 现在是 (batch_size,)，unsqueeze(1) 变为 (batch_size, 1)
+                target_q_value = agent_rewards.unsqueeze(1) + self.gamma * target_q_next * (
+                            1 - agent_dones.unsqueeze(1))
+
+            # 使用当前 Critic 网络评估当前状态-动作对的 Q 值
+            current_q1, current_q2 = self.critics[i](global_states_tensor, actions_tensor)
+
+            # Critic 损失 (MSE)
+            critic_loss = F.mse_loss(current_q1, target_q_value) + F.mse_loss(current_q2, target_q_value)
+            critic_loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.critics[i].parameters(), 0.5)  # 梯度裁剪
+            self.critic_optimizers[i].step()
+            critic_loss_total += critic_loss.item()
+
+            # --- 更新 Actor 网络 ---
+            self.actor_optimizers[i].zero_grad()
+            self.alpha_optimizers[i].zero_grad()
+
+            # 重新采样当前动作和对数概率，因为 Actor 网络可能已更新
+            current_action_i, log_prob_i, _ = self.actors[i].sample(agent_local_states)
+
+            # 构建所有代理的当前动作，其中代理 i 的动作是采样的，其他代理的动作是 detach 的
+            current_actions_all_agents = []
+            for j in range(self.num_agents):
+                current_agent_local_state = local_states_tensor[:,
+                                            j * self.local_state_dim:(j + 1) * self.local_state_dim]
+                if j == i:
+                    current_actions_all_agents.append(current_action_i)
+                else:
+                    # 其他代理的动作从其 Actor 网络中获取，但要 detach 梯度
+                    action_j, _, _ = self.actors[j].sample(current_agent_local_state)
+                    current_actions_all_agents.append(action_j.detach())
+            current_all_actions_tensor = torch.cat(current_actions_all_agents, dim=1)
+
+            # 计算 Actor 损失
+            q1_current, q2_current = self.critics[i](global_states_tensor, current_all_actions_tensor)
+            min_q_current = torch.min(q1_current, q2_current)
+
+            actor_loss = (self.log_alphas[i].exp() * log_prob_i - min_q_current).mean()
+            actor_loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.actors[i].parameters(), 0.5)  # 梯度裁剪
+            self.actor_optimizers[i].step()
+            actor_loss_total += actor_loss.item()
+
+            # --- 更新 Alpha (温度参数) ---
+            alpha_loss = -(self.log_alphas[i].exp() * (log_prob_i + self.target_entropy).detach()).mean()
+            alpha_loss.backward()
+            self.alpha_optimizers[i].step()
+            alpha_loss_total += alpha_loss.item()
+
+        # 软更新目标 Critic 网络
+        self.update_target_networks()
+
+        return actor_loss_total / self.num_agents, critic_loss_total / self.num_agents, alpha_loss_total / self.num_agents
+
+    def save_best_weights(self):
+        """保存当前模型的最佳权重。"""
+        for i in range(self.num_agents):
+            torch.save(self.actors[i].state_dict(), os.path.join(MASAC_DIR, f"best_actor_{i}.pth"))
+            torch.save(self.critics[i].state_dict(), os.path.join(MASAC_DIR, f"best_critic_{i}.pth"))
+            # 直接保存 Parameter 的数据
+            torch.save(self.log_alphas[i].data, os.path.join(MASAC_DIR, f"best_log_alpha_{i}.pth"))
+        print(f"MASAC 模型权重已保存到: {MASAC_DIR}")
+
+    def load_best_weights(self):
+        """加载已保存的最佳模型权重。"""
+        for i in range(self.num_agents):
+            actor_path = os.path.join(MASAC_DIR, f"best_actor_{i}.pth")
+            critic_path = os.path.join(MASAC_DIR, f"best_critic_{i}.pth")
+            log_alpha_path = os.path.join(MASAC_DIR, f"best_log_alpha_{i}.pth")
+            if os.path.exists(actor_path) and os.path.exists(critic_path) and os.path.exists(log_alpha_path):
+                self.actors[i].load_state_dict(torch.load(actor_path, map_location=self.device, weights_only=False))
+                self.critics[i].load_state_dict(torch.load(critic_path, map_location=self.device, weights_only=False))
+                # 直接加载数据到 Parameter 的 data 属性
+                self.log_alphas[i].data.copy_(torch.load(log_alpha_path, map_location=self.device, weights_only=False))
+            else:
+                print(f"警告: 未找到代理 {i} 的 MASAC 模型文件。")
+        print(f"已从 {MASAC_DIR} 加载 MASAC 模型权重。")
+
+
+# 主训练逻辑
+def main():
+    num_agents = 15  # 代理数量
+    max_episodes = 6000  # 最大训练 episode 数量
+    save_interval_path_plot = 50  # 每隔多少个 episode 保存一次路径图
+    save_interval_curve_plot = 50  # 每隔多少个 episode 保存一次训练曲线图和数据
+    patience = 3000  # 早停耐心值
+    max_steps_per_episode = 200  # 每个 episode 的最大步数
+    train_start_steps = 10000  # 经验回放缓冲区达到此数量后开始训练
+
+    # 实例化环境
+    env = MultiAgentPathPlanningEnv(OBSTACLES, PURE_WALKABLE_COORDS, GOAL_COORDS, MAP_BOUNDS, MAP_ROWS, MAP_COLS,
+                                    num_agents, DEVICE, max_steps_per_episode)
+    # 实例化 MASAC 训练器
+    trainer = MASACTrainer(env, DEVICE, num_agents)
+
+    # 训练过程中的统计数据
+    episode_rewards = []  # 总奖励
+    episode_actor_losses = []  # Actor 损失
+    episode_critic_losses = []  # Critic 损失
+    episode_alpha_losses = []  # Alpha 损失 (新增)
+    episode_steps_sum_all_agvs = []  # 所有 AGV 的总步数
+    avg_steps_reached_agvs = []  # 到达目标的 AGV 的平均步数
+    episode_reach_rates = []  # 每个 episode 的到达率
+
+    # 每个代理的奖励和步数历史
+    episode_rewards_per_agent = [[] for _ in range(num_agents)]
+    episode_steps_per_agent = [[] for _ in range(num_agents)]
+
+    best_avg_reward = -float('inf')  # 记录最佳平均奖励
+    patience_counter = 0  # 早停计数器
+
+    print("开始 MASAC 训练...")
+    with tqdm(range(max_episodes), desc="训练进度") as pbar:
+        for episode in pbar:
+            try:
+                # 重置环境，获取初始状态
+                local_states = env.reset()
+                global_state = env._get_global_state()
+
+                per_agent_episode_reward = [0.0] * num_agents
+                per_agent_episode_steps = [0] * num_agents
+                per_agent_reached_goal = [False] * num_agents
+
+                current_episode_total_reward = 0
+                steps_taken_overall_sum = 0
+
+                all_agents_done = False
+
+                # Episode 循环
+                while not all_agents_done:
+                    actions = []
+                    # 收集所有代理的局部状态，以便 Actor 选择动作
+                    current_local_states_list = [local_states[i] for i in range(num_agents)]
+
+                    for i, state in enumerate(current_local_states_list):
+                        # 如果代理已到达目标或达到最大步数，则不再行动
+                        if not per_agent_reached_goal[i] and per_agent_episode_steps[i] < max_steps_per_episode:
+                            action_i = trainer.select_action(state, i, explore=True)
+                            actions.append(action_i)
+                        else:
+                            actions.append(np.zeros(trainer.action_dim, dtype=np.float32))  # 不再移动
+
+                    # 环境步进
+                    next_local_states, next_global_state, rewards, all_agents_done, infos = env.step(actions)
+
+                    # 存储经验到回放缓冲区
+                    flat_local_states = np.concatenate(local_states).astype(np.float32)
+                    flat_next_local_states = np.concatenate(next_local_states).astype(np.float32)
+                    flat_actions = np.concatenate(actions).astype(np.float32)
+                    flat_rewards = np.array(rewards).astype(np.float32)
+                    flat_dones = np.array(
+                        [info['reached_goal'] or info['steps'] >= max_steps_per_episode for info in infos]).astype(
+                        np.float32)
+
+                    trainer.replay_buffer.push(flat_local_states, global_state, flat_actions, flat_rewards,
+                                               flat_next_local_states, next_global_state, flat_dones)
+
+                    # 更新代理的统计信息
+                    for i in range(num_agents):
+                        per_agent_episode_reward[i] += rewards[i]
+                        per_agent_episode_steps[i] = infos[i]['steps']
+                        per_agent_reached_goal[i] = infos[i]['reached_goal']
+
+                    current_episode_total_reward = sum(per_agent_episode_reward)
+                    steps_taken_overall_sum = sum(per_agent_episode_steps)
+                    local_states = next_local_states
+                    global_state = next_global_state
+
+                    # 训练网络 (当缓冲区足够大时)
+                    actor_loss, critic_loss, alpha_loss = 0.0, 0.0, 0.0
+                    if len(trainer.replay_buffer) >= train_start_steps and len(
+                            trainer.replay_buffer) >= trainer.batch_size:
+                        actor_loss, critic_loss, alpha_loss = trainer.train_step()
+
+                # 记录训练统计数据
+                episode_rewards.append(current_episode_total_reward)
+                episode_actor_losses.append(actor_loss)
+                episode_critic_losses.append(critic_loss)
+                episode_alpha_losses.append(alpha_loss)  # 记录 alpha 损失
+                episode_steps_sum_all_agvs.append(steps_taken_overall_sum)
+
+                # 计算到达目标的 AGV 的平均步数和本轮到达率
+                reached_steps_in_episode = []
+                num_reached_agents_in_episode = 0
+                for i in range(num_agents):
+                    if per_agent_reached_goal[i]:
+                        reached_steps_in_episode.append(per_agent_episode_steps[i])
+                        num_reached_agents_in_episode += 1
+
+                current_avg_steps_reached = np.mean(reached_steps_in_episode) if reached_steps_in_episode else 0
+                current_reach_rate = num_reached_agents_in_episode / num_agents
+
+                avg_steps_reached_agvs.append(current_avg_steps_reached)
+                episode_reach_rates.append(current_reach_rate)
+
+                # 更新每个代理的奖励和步数历史
+                for i in range(num_agents):
+                    episode_rewards_per_agent[i].append(per_agent_episode_reward[i])
+                    episode_steps_per_agent[i].append(per_agent_episode_steps[i])
+
+                # 计算过去 100 个 episode 的平均奖励，用于早停判断
+                avg_reward_last_100 = np.mean(episode_rewards[-100:]) if len(
+                    episode_rewards) >= 100 else current_episode_total_reward
+
+                # 计算当前 episode 中每个 AGV 的平均奖励
+                avg_reward_current_agv_episode = np.mean(per_agent_episode_reward)
+                # 计算当前 episode 中每个 AGV 的平均步数
+                avg_steps_current_agv_episode = np.mean(per_agent_episode_steps)
+
+                # 获取 GPU 内存使用情况
+                gpu_allocated_mb, gpu_cached_mb = get_gpu_memory_usage()
+
+                # 更新进度条显示
+                postfix_dict = {
+                    '总奖励': f'{current_episode_total_reward:.2f}',
+                    '平均奖励 (近100)': f'{avg_reward_last_100:.2f}',
+                    'AGV平均奖励 (当前)': f'{avg_reward_current_agv_episode:.2f}',
+                    '总步数 (当前)': steps_taken_overall_sum,
+                    'AGV平均步数 (当前)': f'{avg_steps_current_agv_episode:.1f}',
+                    '到达AGV平均步数': f'{current_avg_steps_reached:.1f}',
+                    '到达率': f'{current_reach_rate:.2f}',
+                    'Actor损失': f'{actor_loss:.4f}',
+                    'Critic损失': f'{critic_loss:.4f}',
+                    'Alpha损失': f'{alpha_loss:.4f}'  # 显示 alpha 损失
+                }
+                if DEVICE.type == 'cuda':
+                    postfix_dict['GPU 内存'] = f'{gpu_allocated_mb:.1f}MB'
+                pbar.set_postfix(postfix_dict)
+
+                # 打印单个 AGV 性能详情
+                print(f"--- Episode {episode + 1} 单个 AGV 性能 ---")
+                for ag_idx, reward_info in enumerate(per_agent_episode_reward):
+                    print(
+                        f" AGV {ag_idx}: 奖励={reward_info:.2f}, 步数={per_agent_episode_steps[ag_idx]}, 到达目标={per_agent_reached_goal[ag_idx]}")
+                print(f"------------------------------------")
+
+                # 定期保存路径图
+                if (episode + 1) % save_interval_path_plot == 0:
+                    current_episode_paths = []
+                    for agent_data in env.agents:
+                        current_episode_paths.append({
+                            'path': agent_data['path_history'],
+                            'goal': agent_data['goal']
+                        })
+                    save_multi_agent_path_plot(OBSTACLES, GOAL_COORDS, MAP_BOUNDS, current_episode_paths,
+                                               os.path.join(MASAC_DIR, f"path_episode_{episode + 1}.png"), AGENT_RADIUS)
+                    print(f"已保存 Episode {episode + 1} 路径图: path_episode_{episode + 1}.png")
+
+                # 定期保存训练曲线图和数据
+                if (episode + 1) % save_interval_curve_plot == 0:
+                    save_training_plots(list(range(len(episode_rewards))), episode_actor_losses, episode_critic_losses,
+                                        episode_rewards, episode_steps_sum_all_agvs,
+                                        episode_rewards_per_agent, episode_steps_per_agent,
+                                        avg_steps_reached_agvs, episode_reach_rates,
+                                        os.path.join(MASAC_DIR, f"training_curves_episode_{episode + 1}.png"))
+                    print(f"已保存 Episode {episode + 1} 训练曲线图: training_curves_episode_{episode + 1}.png")
+
+                    # 保存当前训练结果到 CSV
+                    results_df = pd.DataFrame({
+                        'episode': list(range(len(episode_rewards))),
+                        'total_reward': episode_rewards,
+                        'actor_loss': episode_actor_losses,
+                        'critic_loss': episode_critic_losses,
+                        'alpha_loss': episode_alpha_losses,  # 添加 alpha 损失到 CSV
+                        'total_steps_sum_all_agvs': episode_steps_sum_all_agvs,
+                        'avg_reward_per_agv_per_episode': np.mean(np.array(episode_rewards_per_agent), axis=0),
+                        'avg_steps_per_agv_per_episode': np.mean(np.array(episode_steps_per_agent), axis=0),
+                        'avg_steps_reached_agvs': avg_steps_reached_agvs,
+                        'episode_reach_rates': episode_reach_rates
+                    })
+                    results_df.to_csv(os.path.join(MASAC_DIR, f"training_results_episode_{episode + 1}.csv"),
+                                      index=False)
+                    print(f"已保存 Episode {episode + 1} 训练结果数据: training_results_episode_{episode + 1}.csv")
+
+                # 早停逻辑
+                if avg_reward_last_100 > best_avg_reward:
+                    best_avg_reward = avg_reward_last_100
+                    trainer.save_best_weights()
+                    patience_counter = 0
+                    print(f"\n检测到最佳平均奖励，正在保存 MASAC 模型权重。")
+                else:
+                    patience_counter += 1
+
+                if patience_counter >= patience:
+                    print(f"\n在 {episode + 1} 个 episode 后达到耐心上限，提前停止 MASAC 训练。")
+                    break
+
+            except Exception as e:
+                print(f"\nMASAC 训练过程中发生错误: {e}")
+                traceback.print_exc()
+                break
+
+    print("MASAC 训练结束。")
+
+    # 训练结束后保存最终训练曲线图和结果数据
+    save_training_plots(list(range(len(episode_rewards))), episode_actor_losses, episode_critic_losses,
+                        episode_rewards, episode_steps_sum_all_agvs,
+                        episode_rewards_per_agent, episode_steps_per_agent,
+                        avg_steps_reached_agvs, episode_reach_rates,
+                        os.path.join(MASAC_DIR, "final_training_curves.png"))
+    print(f"最终 MASAC 训练曲线图已保存到: {os.path.join(MASAC_DIR, 'final_training_curves.png')}")
+
+    # 将训练结果保存为 CSV (最终保存，确保完整性)
+    results_df = pd.DataFrame({
+        'episode': list(range(len(episode_rewards))),
+        'total_reward': episode_rewards,
+        'actor_loss': episode_actor_losses,
+        'critic_loss': episode_critic_losses,
+        'alpha_loss': episode_alpha_losses,  # 添加 alpha 损失到 CSV
+        'total_steps_sum_all_agvs': episode_steps_sum_all_agvs,
+        'avg_reward_per_agv_per_episode': np.mean(np.array(episode_rewards_per_agent), axis=0),
+        'avg_steps_per_agv_per_episode': np.mean(np.array(episode_steps_per_agent), axis=0),
+        'avg_steps_reached_agvs': avg_steps_reached_agvs,
+        'episode_reach_rates': episode_reach_rates
+    })
+    results_df.to_csv(os.path.join(MASAC_DIR, "training_results.csv"), index=False)
+    print(f"MASAC 训练结果数据已保存到: {os.path.join(MASAC_DIR, 'training_results.csv')}")
+
+    print("\n开始最终 MASAC 测试...")
+    # 加载最佳模型权重
+    trainer.load_best_weights()
+    local_states = env.reset()
+    global_state = env._get_global_state()
+    test_paths = [[] for _ in range(num_agents)]
+    test_total_rewards = [0] * num_agents
+    test_steps = [0] * num_agents
+    test_reached_goals = [False] * num_agents
+
+    for i, agent_data in enumerate(env.agents):
+        test_paths[i].append(agent_data['pos'].copy())
+
+    all_test_dones = False
+
+    while not all_test_dones:
+        actions = []
+        for i, state in enumerate(local_states):
+            action = trainer.select_action(state, i, explore=False)  # 测试时不探索，选择均值
+            actions.append(action)
+
+        next_local_states, next_global_state, rewards, all_test_dones, infos = env.step(actions)
+
+        for i in range(num_agents):
+            test_paths[i].append(env.agents[i]['pos'].copy())
+            test_total_rewards[i] += rewards[i]
+            test_steps[i] = infos[i]['steps']
+            test_reached_goals[i] = infos[i]['reached_goal']
+        local_states = next_local_states
+        global_state = next_global_state
+
+    print(f"--- 最终 MASAC 测试单个 AGV 性能 ---")
+    final_test_paths_data = []
+    for i in range(num_agents):
+        final_test_paths_data.append({
+            'path': test_paths[i],
+            'goal': env.agents[i]['goal']
+        })
+        print(
+            f" AGV {i}: 奖励={test_total_rewards[i]:.2f}, 步数={test_steps[i]}, 到达目标={test_reached_goals[i]}")
+    print(f"-----------------------------")
+
+    save_multi_agent_path_plot(OBSTACLES, GOAL_COORDS, MAP_BOUNDS, final_test_paths_data,
+                               os.path.join(MASAC_DIR, "final_test_paths.png"), AGENT_RADIUS)
+    print(f"最终 MASAC 测试路径图已保存到: {os.path.join(MASAC_DIR, 'final_test_paths.png')}")
+    print("MASAC 测试结束。")
+
+
+if __name__ == "__main__":
+    main()
+

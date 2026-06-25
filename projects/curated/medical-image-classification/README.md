@@ -2,54 +2,93 @@
 
 ## 项目简介
 
-本项目面向胸部医学影像二分类任务，围绕肺部区域分割、病灶通道注意力和 Swin Transformer 特征提取构建分类模型。项目适合展示医学影像预处理、数据集构建、注意力模块和模型评估能力。
+基于 Swin Transformer 的胸部 X 光片疾病分类。创新性地引入**肺部区域空间注意力**（抑制非肺背景）和**病灶通道注意力**（建模 5 类病灶响应模式），结合 DeepLabV3 肺部掩膜生成和 Albumentations 医学图像增强管线。
 
-原始目录：`医学图像二分类/`
+## 代码架构
+
+### 双注意力机制 (`model.py`)
+
+```python
+class LungAttentionModule(nn.Module):
+    """肺部区域空间注意力
+    Forward: x(B,C,H,W) + lung_mask(B,1,H,W)
+      → F.interpolate 对齐 mask 与特征图分辨率
+      → Conv2d(C→1, 3×3) → Sigmoid → 空间权重
+      → output = x * lung_mask * attention
+      → 抑制非肺部区域 (背景、骨骼、设备标识)
+    """
+
+class LesionChannelAttention(nn.Module):
+    """病灶类型通道注意力
+    Args: in_channels, lesion_types=5 (正常/结节/浸润/空洞/积液)
+    Forward: GAP → FC(C→C//2) → ReLU → FC(C//2→5) → Sigmoid
+      → x * channel_weights (广播至空间维度)
+    """
+```
+
+### Swin Transformer 主干
+
+```python
+from torchvision.models import swin_t  # Swin-Tiny, ImageNet 预训练
+# 输入: 224×224 RGB 胸部 X 光片
+# 特征输出: 多尺度特征图 → 分类头
+# 损失: CrossEntropyLoss / BCEWithLogitsLoss (多标签)
+```
+
+### 数据预处理 (`preprocessing.py`)
+
+```python
+# Albumentations 医学增强:
+#   Resize(224, 224)
+#   RandomBrightnessContrast(p=0.5)
+#   RandomGamma(p=0.3)
+#   CLAHE(clip_limit=2.0, p=0.5)       # 对比度受限自适应直方图均衡
+#   Normalize(mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225])
+
+# 肺部掩膜: DeepLabV3 语义分割 → 二值 mask
+```
+
+### 数据集划分 (`divide.py`)
+
+```python
+# NIH Chest X-ray 数据集 (BBox_List_2017.csv)
+# 14 种疾病多标签分类
+# 患者级分层采样 → Train/Val/Test (避免交叉泄漏)
+```
+
+### 评估 (`evaluate_and_plot.py`)
+
+```python
+# 指标: Accuracy, AUC-ROC (macro/micro), Precision, Recall, F1
+# 曲线: ROC per-class, PR curve, Confusion Matrix heatmap
+```
 
 ## 技术栈
 
-- Python, PyTorch
-- torchvision, Swin Transformer
-- DeepLabV3 ResNet50 肺部分割
-- Albumentations, OpenCV, PIL
-- scikit-learn, matplotlib
-- Dataset/DataLoader, WeightedRandomSampler
+| 类别 | 技术 |
+|------|------|
+| 骨干网络 | Swin Transformer (torchvision swin_t) |
+| 注意力 | LungAttentionModule (空间) + LesionChannelAttention (通道) |
+| 分割 | DeepLabV3 (肺部区域提取) |
+| 数据增强 | Albumentations (CLAHE, Gamma, Brightness) |
+| 数据集 | NIH Chest X-ray (112,120 张, 14 种疾病) |
 
-## 主要功能
+## 运行方式
 
-- 按数据清单拆分训练集、验证集和测试集。
-- 实现医学图像增强、归一化和张量转换。
-- 使用肺部分割模型生成肺部区域掩码。
-- 在分类模型中加入肺部注意力和病灶通道注意力。
-- 输出 ROC、PR 曲线、AUC、Accuracy 等评估结果。
-
-## 工作链路
-
-1. 读取影像文件和标签清单，过滤重复或异常样本。
-2. 将数据划分为训练、验证、测试集合。
-3. 对图像进行尺寸调整、增强、归一化和采样权重计算。
-4. 可选加载分割模型，对肺部区域进行掩码约束。
-5. 使用 Swin Transformer 主干和注意力模块完成二分类。
-6. 在测试集上输出分类指标和可视化曲线。
-
-## 知识点
-
-- 医学影像数据清洗和类别不平衡处理。
-- 肺部分割与分类模型的联合使用。
-- 注意力机制在医学影像中的应用。
-- ROC、PR、AUC 等分类评估指标。
-- PyTorch Dataset 和 DataLoader 工程组织。
+```bash
+pip install torch torchvision albumentations numpy pandas matplotlib scikit-learn
+python preprocessing.py        # 图像增强 + 肺部掩膜生成
+python divide.py               # 患者级分层数据划分
+python model.py                # Swin + 双注意力训练
+python evaluate_and_plot.py    # 评估报告 + ROC/PR 曲线
+```
 
 ## 关键文件
 
-- `model.py`：分类模型、肺部注意力模块和病灶通道注意力。
-- `preprocessing.py`：医学图像增强、数据集、采样器和分割模型加载。
-- `divide.py`：数据集划分脚本。
-- `evaluate_and_plot.py`：评估指标和曲线绘制。
-- `BBox_List_2017.csv`：小型标注清单样例。
-
-## 整理说明
-
-- 已移除原始影像数据、训练缓存、模型权重和临时输出。
-- 当前目录保留可说明算法链路的模型、预处理、划分和评估代码。
-- 完整数据集和训练权重不入库，后续可通过外部链接补充。
+| 文件 | 说明 |
+|------|------|
+| `model.py` | Swin Transformer + LungAttention + LesionChannelAttention |
+| `preprocessing.py` | Albumentations 增强 + DeepLabV3 掩膜生成 |
+| `divide.py` | 患者级 Train/Val/Test 划分 |
+| `evaluate_and_plot.py` | AUC-ROC, PR, Confusion Matrix |
+| `BBox_List_2017.csv` | NIH 数据集标注文件 |

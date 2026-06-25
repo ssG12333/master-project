@@ -22,3 +22,4 @@
 - [PPO 二阶旋转倒立摆控制](ppo-rotary-pendulum-control/README.md)
 - [区块链拜占庭共识仿真](blockchain-byzantine-consensus/README.md)
 - [随机森林交通事故预测](accident-random-forest-forecasting/README.md)
+- [数学建模竞赛合集](math-modeling-competitions/README.md)

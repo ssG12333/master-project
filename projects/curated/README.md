@@ -24,3 +24,4 @@
 | [PPO 二阶旋转倒立摆控制](ppo-rotary-pendulum-control/README.md) | 强化学习控制 | Gymnasium 自定义环境、PPO、连续控制、pygame 渲染 |
 | [区块链拜占庭共识仿真](blockchain-byzantine-consensus/README.md) | 分布式系统/区块链 | PBFT/MVBC、Hash-DAC、Merkle Proof、性能统计 |
 | [随机森林交通事故预测](accident-random-forest-forecasting/README.md) | 机器学习预测 | 事故时间序列、随机森林、特征编码、可视化评估 |
+| [数学建模竞赛合集](math-modeling-competitions/README.md) | 数学建模竞赛（3 场） | 传感器校正、边坡监测、社交媒体预测、CEEMDAN/RL/DL 双轨方案 |

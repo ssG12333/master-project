@@ -32,7 +32,8 @@
 - [通用时间序列预测框架](projects/curated/time-series-forecasting/README.md)
 - [股票预测与回测分析](projects/curated/stock-forecasting/README.md)
 - [随机森林交通事故预测](projects/curated/accident-random-forest-forecasting/README.md)
-- 天气预测、音乐预测、数学建模、可视化绘图等项目已归入数据建模类。
+- [数学建模竞赛合集（国赛 + 校赛）](projects/curated/math-modeling-competitions/README.md)
+- 天气预测、音乐预测、可视化绘图等项目已归入数据建模类。
 
 ### 自然语言处理与其他
 

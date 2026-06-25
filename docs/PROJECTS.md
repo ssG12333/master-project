@@ -24,6 +24,7 @@
 | PPO 二阶旋转倒立摆 | `二阶旋转倒立摆/` | 强化学习控制 | Gymnasium, Stable-Baselines3, PPO, pygame, PyTorch | 自定义控制环境、PPO 训练、物理渲染 |
 | 区块链拜占庭共识 | `区块链拜占庭/` | 分布式系统/区块链 | Python, PBFT/MVBC, Hash-DAC, Merkle Tree, matplotlib | 拜占庭节点仿真、数据可用性证明、性能统计 |
 | 随机森林交通事故预测 | `随机森林事故预测/` | 机器学习预测 | pandas, scikit-learn, RandomForestRegressor, seaborn | 事故时间序列、类别编码、预测评估和可视化 |
+| 数学建模竞赛合集 | `2025国赛数学建模/`, `2025校赛数学建模/`, `2026校赛数学建模/` | 数学建模竞赛 | Python, PyTorch, CEEMDAN, Ridge/SVR, RLlib, DQN/SAC/DDPG, TFT, GAT, XGBoost | 传感器数据校正、边坡监测、社交媒体预测、双轨方法论(Baseline+Advanced) |
 
 ## 可合并展示
 
